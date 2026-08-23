@@ -1,161 +1,170 @@
 <div align="center">
 
-# 💬 Enterprise Real-Time Chat Platform
-### High-Performance Full-Stack Messaging Platform with Zero-Sleep Cloud Architecture
+# ChatApp — Real-Time Messaging Platform
 
-[![Next.js](https://img.shields.io/badge/Next.js-16.2-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
-[![React](https://img.shields.io/badge/React-19.0-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://react.dev/)
-[![Bun](https://img.shields.io/badge/Bun-1.4+-fbf0df?style=for-the-badge&logo=bun&logoColor=black)](https://bun.sh/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-316192?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![Drizzle ORM](https://img.shields.io/badge/Drizzle_ORM-0.45-C5F74F?style=for-the-badge&logo=drizzle&logoColor=black)](https://orm.drizzle.team/)
-[![Socket.IO](https://img.shields.io/badge/Socket.io-4.8-010101?style=for-the-badge&logo=socket.io&logoColor=white)](https://socket.io/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Oracle Cloud](https://img.shields.io/badge/Oracle_Cloud-Always_Free_VPS-F80000?style=for-the-badge&logo=oracle&logoColor=white)](https://www.oracle.com/cloud/free/)
-[![Vercel](https://img.shields.io/badge/Vercel-Edge_CDN-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
+A full-stack, low-latency chat application built with Next.js 16, Bun, PostgreSQL (Drizzle ORM), and Socket.IO.  
+Designed for 24/7 production uptime with zero cold starts, self-hosted on Oracle Cloud Infrastructure and Vercel.
+
+[**Explore Live Demo**](https://chat-application-mocha-xi.vercel.app) • [**Backend Health Check**](http://xvg69sogcx42p7o5ewsxh84m.144.24.112.62.sslip.io/health)
 
 <br/>
 
-**[🌐 Live Production Website](https://chat-application-mocha-xi.vercel.app)** • **[⚡ Backend API Health](http://xvg69sogcx42p7o5ewsxh84m.144.24.112.62.sslip.io/health)**
+[![Next.js](https://img.shields.io/badge/Next.js-16.2-000000?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19.0-20232a?style=flat-square&logo=react)](https://react.dev/)
+[![Bun](https://img.shields.io/badge/Bun-1.4+-fbf0df?style=flat-square&logo=bun&logoColor=black)](https://bun.sh/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178c6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-316192?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Drizzle ORM](https://img.shields.io/badge/Drizzle-0.45-C5F74F?style=flat-square&logo=drizzle&logoColor=black)](https://orm.drizzle.team/)
+[![Socket.IO](https://img.shields.io/badge/Socket.IO-4.8-010101?style=flat-square&logo=socket.io)](https://socket.io/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 
 </div>
 
 ---
 
-## 🌟 Key Features
+## Overview
 
-* 🚀 **Sub-200ms Real-Time Messaging**: Built on persistent bi-directional WebSockets with room-scoped message broadcasting.
-* 💬 **1-on-1 Direct & Multi-User Group Channels**: Create instant private chats or multi-member group channels with admin roles and dynamic membership.
-* 🟢 **Live Presence Engine**: Real-time online/offline indicators across multi-device/multi-tab user sessions.
-* ✍️ **Ephemeral Typing Indicators**: Debounced and throttled `user_typing` and `user_stop_typing` broadcasts.
-* ⏱️ **Zero-Flicker Optimistic UI**: Immediate local message dispatch with temporary UUID reconciliation upon server acknowledgment.
-* ✓✓ **WhatsApp-Style Read Receipts**: Real-time message status transitions (`sending` $\to$ `sent` $\to$ `read`).
-* 🗑️ **Full Data Lifecycle Control**: "Delete for everyone" message removal, "Clear Chat History", and full conversation removal via PostgreSQL `ON DELETE CASCADE`.
-* 🛡️ **Stateless JWT & Bcrypt Authentication**: Salted password hashing and cryptographic socket handshake token verification.
-* 📊 **Cursor-Based Pagination**: Millisecond timestamp seeks via compound B-Tree indexing on `(conversation_id, created_at)`.
-* 🧹 **Automated Database Storage Retention**: Built-in CLI retention pruner (`bun run cleanup`) and secured admin API endpoint to prevent database bloat.
-* 💰 **100% Free Hosting Architecture**: Self-hosted on an **Oracle Cloud Always Free VPS (4 ARM OCPUs, 24 GB RAM)** via Coolify and **Vercel Edge CDN** at $0.00/month cost with zero sleep lag.
+Most real-time chat side-projects either rely on expensive third-party wrappers (Pusher, Firebase) or suffer from free-tier cold-starts (where platforms like Render or Railway sleep after 15 minutes of inactivity, causing 30–50 second lag on waking).
+
+I built **ChatApp** to solve this problem from first principles: a modern, decoupled messaging platform with sub-200ms round-trip latency, full relational data integrity, optimistic UI updates, and automated storage retention—hosted on dedicated Always Free cloud infrastructure without monthly hosting bills or sleep timers.
 
 ---
 
-## 🏗️ System Architecture
+## Key Features
+
+### 1. Real-Time Communication & Messaging
+- **1-on-1 Direct & Multi-User Groups**: Start instant direct chats or create named group channels with dynamic participant lists.
+- **Room-Scoped Event Broadcasting**: Sockets join isolated conversation rooms (`conv_${conversationId}`) rather than polluting the global namespace.
+- **Optimistic UI Dispatch**: Messages render locally with a temporary ID and transition to double checkmarks (`✓✓`) as soon as the server acknowledges the write.
+- **Delivery & Read Receipts**: Real-time read synchronization across all participants when a chat is opened.
+- **Ephemeral State**: Debounced typing indicators (`user_typing` / `user_stop_typing`) and multi-device/multi-tab online presence tracking.
+
+### 2. Data Lifecycle & Maintenance
+- **Message Deletion ("Delete for Everyone")**: Hover over any sent message to delete it from the database and broadcast the removal to all clients in real time.
+- **Clear Chat History**: Empty conversation history while keeping the conversation room active.
+- **Conversation Deletion**: Remove conversations completely, with PostgreSQL `ON DELETE CASCADE` automatically cleaning up participants, messages, and read receipts.
+- **Automated Storage Retention**: Built-in CLI pruner (`bun run cleanup`) and secured admin API endpoint to purge stale test data and enforce retention policies.
+
+### 3. Security & Validation
+- **Stateless Authentication**: JWT tokens with bcrypt password hashing and salting.
+- **Socket Handshake Auth**: WebSocket connection upgrades are authenticated via JWT before socket session allocation.
+- **Input Sanitization**: Defensive validation on usernames, passwords, and message payloads with custom HTTP error middleware.
+
+---
+
+## Architecture & Engineering Decisions
 
 ```mermaid
 flowchart TB
     subgraph Client["Frontend Client (Vercel Edge CDN)"]
-        UI["Next.js 16 (App Router) + React 19\nTailwind CSS Dark Theme (WhatsApp/Telegram Aesthetic)\nStateful Socket.IO Client + Optimistic UI"]
+        UI["Next.js 16 App Router + React 19\nTailwind CSS Dark Theme (WhatsApp/Telegram Aesthetic)\nStateful Socket.IO Client + Optimistic UI"]
     end
 
-    subgraph Transport["Transport & Routing Layer"]
-        VercelDNS["Vercel Global Anycast CDN"]
-        OracleIGW["OCI Internet Gateway / Firewall (:80, :443, :8000)"]
-        ReverseProxy["Caddy / Traefik Reverse Proxy (SSL Termination)"]
-    end
-
-    subgraph Backend["Backend Engine (Oracle Cloud Always Free VPS)"]
-        BunRuntime["Bun 1.4+ Runtime in Docker CE Container"]
-        ExpressApp["Express API Router (REST Endpoints)"]
-        SocketServer["Socket.IO Real-Time Engine (Room Topologies)"]
-        Drizzle["Drizzle ORM 0.45 (Typed SQL Query Builder)"]
+    subgraph Infrastructure["Compute & Reverse Proxy (Oracle Cloud VPS)"]
+        Caddy["Caddy / Traefik Reverse Proxy (SSL Termination)"]
+        Docker["Docker CE Container (oven/bun:1-slim)"]
+        Express["Express 5 REST API Router"]
+        SocketEngine["Socket.IO Real-Time Engine"]
+        Drizzle["Drizzle ORM 0.45 (Zero-Overhead SQL Builder)"]
     end
 
     subgraph Database["Managed Cloud Database (Supabase)"]
-        Pooler["Supabase Connection Pooler (AWS Mumbai IPv4 :6543)"]
-        Postgres[("PostgreSQL 15+\n- Normalized Junctions\n- Composite Index: (conversation_id, created_at)\n- ON DELETE CASCADE")]
+        Pooler["Supabase IPv4 Connection Pooler (:6543)"]
+        Postgres[("PostgreSQL 15+\n- Foreign Keys with ON DELETE CASCADE\n- Compound Cursor Index: (conversation_id, created_at)")]
     end
 
-    UI -->|"HTTPS Static Delivery"| VercelDNS
-    UI -->|"REST API Requests"| ReverseProxy
-    UI <-->|"Bi-directional WSS"| ReverseProxy
+    UI -->|"HTTPS Static Delivery"| Client
+    UI -->|"REST API Requests"| Caddy
+    UI <-->|"Bi-directional WebSockets"| Caddy
     
-    ReverseProxy --> OracleIGW
-    OracleIGW --> BunRuntime
-    BunRuntime --> ExpressApp
-    BunRuntime --> SocketServer
-    
-    ExpressApp --> Drizzle
-    SocketServer --> Drizzle
+    Caddy --> Docker
+    Docker --> Express
+    Docker --> SocketEngine
+    Express --> Drizzle
+    SocketEngine --> Drizzle
     Drizzle --> Pooler
     Pooler --> Postgres
 ```
 
----
+### Why these technical choices?
 
-## 🛠️ Tech Stack
-
-| Layer | Technology | Rationale |
+| Decision | Alternative Considered | Engineering Rationale |
 | :--- | :--- | :--- |
-| **Frontend Framework** | [Next.js 16 (App Router)](https://nextjs.org/) + [React 19](https://react.dev/) | High-speed Server Components, React 19 actions, Turbopack builds |
-| **Styling & UI** | [Tailwind CSS](https://tailwindcss.com/) + [Lucide Icons](https://lucide.dev/) | WhatsApp / Telegram Dark Theme (`#0b141a`, `#00a884`, `#005c4b`) |
-| **Backend Runtime** | [Bun 1.4+](https://bun.sh/) | Ultra-fast JavaScript runtime, native TypeScript execution, instant cold starts |
-| **API & Realtime** | [Express 5](https://expressjs.com/) + [Socket.IO 4.8](https://socket.io/) | Robust REST routing, room-based WebSocket broadcasting, handshake JWT validation |
-| **Database & ORM** | [PostgreSQL 15](https://www.postgresql.org/) + [Drizzle ORM](https://orm.drizzle.team/) | Strict relational integrity, `ON DELETE CASCADE`, composite B-Tree cursor pagination |
-| **Managed DB Host** | [Supabase](https://supabase.com/) | Managed PostgreSQL with built-in AWS Mumbai IPv4 Connection Pooler |
-| **Backend Hosting** | [Oracle Cloud (OCI)](https://www.oracle.com/cloud/free/) + [Coolify](https://coolify.io/) | 4 ARM OCPUs, 24 GB RAM, 200 GB SSD Always Free VM with self-hosted PaaS |
-| **Frontend Hosting** | [Vercel](https://vercel.com/) | Global Anycast Edge CDN delivery |
+| **Bun 1.4+ Runtime** | Node.js / ts-node | Instant cold starts, native TypeScript execution without build steps, built-in fast test runner (`bun test`), and lower memory footprint. |
+| **PostgreSQL + Drizzle** | MongoDB + Mongoose | MongoDB arrays for read receipts risk unbounded document growth. PostgreSQL provides foreign keys with `ON DELETE CASCADE`, composite B-tree indexes, and compile-time type safety via Drizzle ORM. |
+| **Compound Indexing** | Offset pagination (`skip/limit`) | Added index on `(conversation_id, created_at)`. Allows cursor-based queries to seek directly to the latest messages in $\mathcal{O}(\log N)$ time, avoiding slow table scans. |
+| **3-Tier LLD Architecture** | Monolithic route handlers | Separated into Controller $\to$ Service $\to$ Repository layers. Domain logic is decoupled from HTTP transport, making services mockable and unit-testable. |
+| **Oracle Cloud Always Free** | Render / Railway / Fly.io | 4 Ampere ARM OCPUs, 24 GB RAM, 200 GB SSD. Completely eliminates the 15-minute sleep timer problem while costing $0.00/month. |
 
 ---
 
-## 🗄️ Database Schema & Relational Design
+## Database Schema
 
 ```mermaid
 erDiagram
     USERS ||--o{ CONVERSATION_PARTICIPANTS : "joins"
     USERS ||--o{ MESSAGES : "sends"
-    USERS ||--o{ MESSAGE_READS : "reads"
-    CONVERSATIONS ||--o{ CONVERSATION_PARTICIPANTS : "contains"
-    CONVERSATIONS ||--o{ MESSAGES : "has"
-    MESSAGES ||--o{ MESSAGE_READS : "acknowledged by"
+    USERS ||--o{ MESSAGE_READS : "acknowledges"
+    CONVERSATIONS ||--o{ CONVERSATION_PARTICIPANTS : "has"
+    CONVERSATIONS ||--o{ MESSAGES : "contains"
+    MESSAGES ||--o{ MESSAGE_READS : "tracked by"
 
     USERS {
-        uuid id PK "defaultRandom()"
-        varchar username UK "Unique max 50"
-        text password "Salted bcrypt hash"
+        uuid id PK
+        varchar username UK
+        text password
         timestamp created_at
         timestamp updated_at
     }
 
     CONVERSATIONS {
-        uuid id PK "defaultRandom()"
-        boolean is_group "default false"
-        varchar name "Group title (nullable)"
-        uuid admin_id FK "References users.id"
-        uuid last_message_id FK "References messages.id"
+        uuid id PK
+        boolean is_group
+        varchar name
+        uuid admin_id FK
+        uuid last_message_id FK
         timestamp created_at
-        timestamp updated_at "Indexed for sidebar sort"
+        timestamp updated_at
     }
 
     CONVERSATION_PARTICIPANTS {
-        uuid conversation_id PK,FK "ON DELETE CASCADE"
-        uuid user_id PK,FK "ON DELETE CASCADE"
+        uuid conversation_id PK,FK
+        uuid user_id PK,FK
         timestamp joined_at
     }
 
     MESSAGES {
-        uuid id PK "defaultRandom()"
-        uuid conversation_id FK "ON DELETE CASCADE"
-        uuid sender_id FK "ON DELETE CASCADE"
-        varchar sender_name "Denormalized for O(1) reads"
-        text text "Message text"
-        varchar status "sent | delivered | read"
-        timestamp created_at "Indexed compound"
+        uuid id PK
+        uuid conversation_id FK
+        uuid sender_id FK
+        varchar sender_name
+        text text
+        varchar status
+        timestamp created_at
         timestamp updated_at
     }
 
     MESSAGE_READS {
-        uuid message_id PK,FK "ON DELETE CASCADE"
-        uuid user_id PK,FK "ON DELETE CASCADE"
+        uuid message_id PK,FK
+        uuid user_id PK,FK
         timestamp read_at
     }
 ```
 
 ---
 
-## 🚀 Quick Start (Local Development)
+## Getting Started
 
-### 1. Prerequisites
-* **Bun (v1.4+)**: [Install Bun](https://bun.sh/) (`curl -fsSL https://bun.sh/install | bash`)
-* **PostgreSQL Database**: Free cloud database on [Supabase](https://supabase.com) or local PostgreSQL instance.
+### Prerequisites
+- [Bun](https://bun.sh/) (v1.4 or later)
+- PostgreSQL database (local or cloud instance via [Supabase](https://supabase.com))
+
+### 1. Clone the repository
+```bash
+git clone https://github.com/abhishekgupta1025/chat-application.git
+cd chat-application
+```
 
 ### 2. Backend Setup
 ```bash
@@ -164,18 +173,27 @@ cd backend
 # Install dependencies
 bun install
 
-# Configure environment variables (.env)
+# Configure environment variables
 cp .env.example .env
-# Edit .env with your DATABASE_URL, JWT_SECRET, PORT=5000, FRONTEND_URL=http://localhost:3000
+```
 
-# Push database schema to PostgreSQL
+Edit `backend/.env` with your credentials:
+```env
+PORT=5000
+DATABASE_URL=postgresql://postgres:[password]@[host]:6543/postgres?sslmode=require
+JWT_SECRET=your_jwt_secret_key
+FRONTEND_URL=http://localhost:3000
+```
+
+Push database schema & start server:
+```bash
+# Push schema migrations to PostgreSQL
 bun run db:push
 
-# Start development server
+# Start development server (with hot reload)
 bun run dev
 ```
-* Backend will be running at: `http://localhost:5000`
-* Run test suite: `bun test`
+Backend will start on `http://localhost:5000`.
 
 ### 3. Frontend Setup
 ```bash
@@ -184,38 +202,44 @@ cd ../frontend
 # Install dependencies
 bun install
 
-# Configure environment variables (.env.local)
+# Configure environment variables
 echo "NEXT_PUBLIC_BACKEND_URL=http://localhost:5000" > .env.local
 
 # Start Next.js development server
 bun run dev
 ```
-* Frontend will be accessible at: `http://localhost:3000`
+Open `http://localhost:3000` in your browser.
 
 ---
 
-## 🧹 Database Maintenance & Storage Retention
+## Storage Maintenance & Retention Scripts
 
-To ensure the database stays lean and under free storage quotas:
+To keep database storage lean on free-tier limits, run the built-in maintenance utilities from `backend/`:
 
 ```bash
-cd backend
-
-# Purge automated test accounts (alpha_*, live_*, test_*) and empty conversations
+# Purge automated test accounts (alpha_*, test_*) and orphaned chats
 bun run cleanup
 
-# Enforce a 30-day message retention policy
+# Apply a 30-day message retention policy
 bun run cleanup:30days
 
-# Full database message reset (development testing)
+# Complete message reset for fresh benchmarking
 bun run cleanup:all
+```
+
+Alternatively, trigger cleanup over HTTP:
+```bash
+curl -X POST http://localhost:5000/api/admin/cleanup \
+  -H "Content-Type: application/json" \
+  -H "x-admin-key: your_jwt_secret_key" \
+  -d '{"days": 30}'
 ```
 
 ---
 
-## 🧪 Testing & Verification
+## Testing
 
-The project includes unit, integration, and live end-to-end production test suites:
+The project includes unit, integration, and live WebSocket test suites:
 
 ```bash
 cd backend
@@ -226,11 +250,19 @@ bun test
  26 pass
  0 fail
  70 expect() calls
-Ran 26 tests across 6 files. [100% Pass Rate]
+Ran 26 tests across 6 files. [100% pass rate]
 ```
 
 ---
 
-## 📄 License
+## Deployment Architecture
 
-This project is open-source and available under the [MIT License](LICENSE).
+- **Frontend**: Hosted on **Vercel** with automatic Git deployments and global Edge CDN caching.
+- **Backend**: Containerized via Docker (`oven/bun:1-slim`) and managed through **Coolify** on an **Oracle Cloud Always Free VM** (Ubuntu 24.04 LTS, 4 ARM OCPUs, 24 GB RAM).
+- **Database**: **Supabase Managed PostgreSQL** connected over IPv4 pooler transaction mode.
+
+---
+
+## License
+
+Distributed under the [MIT License](LICENSE).
