@@ -18,6 +18,10 @@ bun.lock
 .env.test.local
 .env.production.local
 
+# Private Documentation & Notes (Excluded from GitHub)
+doc/
+INTERVIEW_QUESTIONS_THOROUGH.md
+
 # Logs
 *.log
 npm-debug.log*
