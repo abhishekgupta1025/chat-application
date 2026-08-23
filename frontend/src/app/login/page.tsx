@@ -61,8 +61,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex h-screen w-screen items-center justify-center bg-[#111b21] text-[#e9edef] p-4 font-sans select-none">
-      <div className="w-full max-w-sm bg-[#202c33] border border-[#222e35] rounded-2xl p-7 shadow-2xl space-y-6">
+    <div className="flex min-h-[100dvh] w-full items-center justify-center bg-[#111b21] text-[#e9edef] p-4 sm:p-6 font-sans select-none">
+      <div className="w-full max-w-sm bg-[#202c33] border border-[#222e35] rounded-2xl p-6 sm:p-7 shadow-2xl space-y-6">
         
         {/* Header */}
         <div className="space-y-1.5 text-center">

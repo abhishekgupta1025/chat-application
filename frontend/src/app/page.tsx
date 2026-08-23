@@ -36,7 +36,9 @@ import {
   MoreVertical,
   Paperclip,
   Trash2,
-  Eraser
+  Eraser,
+  ChevronLeft,
+  Lock
 } from 'lucide-react';
 
 const RAW_BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://xvg69sogcx42p7o5ewsxh84m.144.24.112.62.sslip.io';
@@ -156,7 +158,9 @@ export default function ChatPage() {
         if (convRes.ok) {
           const convData = await convRes.json();
           setConversations(convData);
-          if (convData.length > 0) setActiveConversation(convData[0]);
+          if (convData.length > 0 && typeof window !== 'undefined' && window.innerWidth >= 768) {
+            setActiveConversation(convData[0]);
+          }
         }
 
         if (usersRes.ok) {
@@ -516,12 +520,16 @@ export default function ChatPage() {
   });
 
   return (
-    <div className="flex h-screen w-screen bg-[#111b21] text-[#e9edef] antialiased overflow-hidden font-sans select-none">
+    <div className="flex h-[100dvh] w-full bg-[#111b21] text-[#e9edef] antialiased overflow-hidden font-sans select-none">
       
       {/* =========================================================================
           LEFT PANEL: TELEGRAM / WHATSAPP STYLE CHAT LIST
           ========================================================================= */}
-      <aside className="w-80 sm:w-96 flex-none bg-[#111b21] border-r border-[#222e35] flex flex-col h-full z-20">
+      <aside
+        className={`w-full md:w-80 lg:w-96 flex-none bg-[#111b21] md:border-r border-[#222e35] flex-col h-full z-20 ${
+          activeConversation ? 'hidden md:flex' : 'flex'
+        }`}
+      >
         
         {/* User Header */}
         <div className="h-16 px-4 bg-[#202c33] flex items-center justify-between border-b border-[#222e35]">
@@ -800,13 +808,39 @@ export default function ChatPage() {
       {/* =========================================================================
           RIGHT MAIN STAGE: TELEGRAM / WHATSAPP STYLE CHAT CANVAS
           ========================================================================= */}
-      <main className="flex-1 flex flex-col h-full bg-[#0b141a] relative overflow-hidden">
-        
-        {/* Top Header */}
-        <header className="h-16 px-4 bg-[#202c33] border-b border-[#222e35] flex items-center justify-between z-10">
-          <div className="flex items-center gap-3 min-w-0">
-            {activeConversation ? (
-              <>
+      <main
+        className={`flex-1 flex-col h-full bg-[#0b141a] relative overflow-hidden ${
+          activeConversation ? 'flex' : 'hidden md:flex'
+        }`}
+      >
+        {!activeConversation ? (
+          /* Desktop Splash Screen when no chat is selected */
+          <div className="hidden md:flex flex-1 flex-col items-center justify-center p-8 bg-[#111b21] text-center border-b-[6px] border-[#00a884]">
+            <div className="w-20 h-20 rounded-full bg-[#202c33] text-[#00a884] flex items-center justify-center mx-auto mb-4 shadow-xl">
+              <MessageSquare className="w-10 h-10" />
+            </div>
+            <h2 className="text-2xl font-light text-[#e9edef] mb-2">ChatApp for Web</h2>
+            <p className="text-sm text-[#8696a0] max-w-sm leading-relaxed mb-6">
+              Send and receive real-time messages with end-to-end relational data integrity. Select a contact or group to start chatting.
+            </p>
+            <div className="flex items-center gap-1.5 text-xs text-[#8696a0]">
+              <Lock className="w-3.5 h-3.5 text-[#00a884]" /> End-to-end encrypted • Bun + PostgreSQL
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Top Header */}
+            <header className="h-16 px-3 sm:px-4 bg-[#202c33] border-b border-[#222e35] flex items-center justify-between z-10 flex-none">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                {/* Mobile Back Button */}
+                <button
+                  onClick={() => setActiveConversation(null)}
+                  className="md:hidden p-1.5 -ml-1 hover:bg-[#374248] rounded-full text-[#aebac1] hover:text-[#e9edef] transition-colors"
+                  title="Back to chats"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+
                 <div className="relative flex-none">
                   <Avatar className={`w-10 h-10 ${activeConversation.isGroup ? 'bg-[#005c4b]' : getAvatarColor(getConversationTitle(activeConversation))} text-white font-semibold text-sm`}>
                     <AvatarFallback>
@@ -830,15 +864,9 @@ export default function ChatPage() {
                       : 'offline'}
                   </p>
                 </div>
-              </>
-            ) : (
-              <span className="text-sm text-[#8696a0]">Select a chat</span>
-            )}
-          </div>
+              </div>
 
-          <div className="flex items-center gap-2 text-[#aebac1]">
-            {activeConversation && (
-              <>
+              <div className="flex items-center gap-1 sm:gap-2 text-[#aebac1]">
                 <button
                   onClick={handleClearChat}
                   className="p-2 hover:bg-[#374248] rounded-full text-[#aebac1] hover:text-[#e9edef] transition-colors"
@@ -853,14 +881,12 @@ export default function ChatPage() {
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
-              </>
-            )}
-            <span
-              className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-[#00a884]' : 'bg-red-500 animate-pulse'}`}
-              title={isConnected ? 'WSS Connected' : 'Disconnected'}
-            />
-          </div>
-        </header>
+                <span
+                  className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-[#00a884]' : 'bg-red-500 animate-pulse'} ml-1`}
+                  title={isConnected ? 'WSS Connected' : 'Disconnected'}
+                />
+              </div>
+            </header>
 
         {/* Message Feed Canvas (WhatsApp / Telegram Styled) */}
         <ScrollArea className="flex-1 px-4 sm:px-12 py-4 bg-[#0b141a]">
@@ -912,7 +938,7 @@ export default function ChatPage() {
                   )}
 
                   <div
-                    className={`relative max-w-[80%] sm:max-w-[65%] px-3.5 py-2 rounded-2xl shadow-md text-sm leading-relaxed ${
+                    className={`relative max-w-[85%] sm:max-w-[70%] px-3.5 py-2 rounded-2xl shadow-md text-sm leading-relaxed ${
                       isMine
                         ? 'bg-[#005c4b] text-[#e9edef] rounded-tr-xs'
                         : 'bg-[#202c33] text-[#e9edef] rounded-tl-xs'
@@ -958,16 +984,16 @@ export default function ChatPage() {
         </ScrollArea>
 
         {/* Input Bar (WhatsApp / Telegram Dock) */}
-        <div className="p-3 bg-[#202c33] border-t border-[#222e35] relative">
+        <div className="p-2.5 sm:p-3 bg-[#202c33] border-t border-[#222e35] relative">
           
           {/* Emoji Picker Menu */}
           {showEmojiPicker && (
-            <div className="absolute bottom-full mb-2 left-4 bg-[#222e35] border border-[#374248] rounded-2xl p-2 shadow-2xl flex items-center gap-1 z-30">
+            <div className="absolute bottom-full mb-2 left-2 right-2 sm:right-auto sm:left-4 bg-[#222e35] border border-[#374248] rounded-2xl p-2 shadow-2xl flex items-center justify-between sm:justify-start gap-1 z-30 overflow-x-auto">
               {POPULAR_EMOJIS.map((emoji) => (
                 <button
                   key={emoji}
                   onClick={() => handleAddEmoji(emoji)}
-                  className="p-1.5 hover:bg-[#374248] rounded-lg text-lg transition-transform hover:scale-125"
+                  className="p-1.5 hover:bg-[#374248] rounded-lg text-lg transition-transform hover:scale-125 flex-none"
                 >
                   {emoji}
                 </button>
@@ -977,15 +1003,15 @@ export default function ChatPage() {
 
           <form
             onSubmit={handleSendMessage}
-            className="max-w-3xl mx-auto flex items-center gap-2"
+            className="max-w-3xl mx-auto flex items-center gap-1.5 sm:gap-2"
           >
             <button
               type="button"
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className="p-2 text-[#8696a0] hover:text-[#e9edef] hover:bg-[#374248] rounded-full transition-colors"
+              className="p-2 text-[#8696a0] hover:text-[#e9edef] hover:bg-[#374248] rounded-full transition-colors flex-none"
               title="Insert Emoji"
             >
-              <Smile className="w-6 h-6" />
+              <Smile className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
 
             <Input
@@ -999,19 +1025,21 @@ export default function ChatPage() {
               value={messageInput}
               onChange={handleInputChange}
               disabled={!isConnected || !activeConversation}
-              className="flex-1 h-11 bg-[#2a3942] border-0 text-sm text-[#e9edef] placeholder:text-[#8696a0] rounded-xl focus-visible:ring-1 focus-visible:ring-[#00a884] px-4"
+              className="flex-1 h-10 sm:h-11 bg-[#2a3942] border-0 text-sm text-[#e9edef] placeholder:text-[#8696a0] rounded-xl focus-visible:ring-1 focus-visible:ring-[#00a884] px-3.5 sm:px-4"
             />
 
             <button
               type="submit"
               disabled={!isConnected || !messageInput.trim() || !activeConversation}
-              className="w-11 h-11 rounded-full bg-[#00a884] hover:bg-[#029070] text-white flex items-center justify-center shadow-md transition-all disabled:opacity-40 flex-none"
+              className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#00a884] hover:bg-[#029070] text-white flex items-center justify-center shadow-md transition-all disabled:opacity-40 flex-none"
               title="Send Message"
             >
-              <Send className="w-5 h-5 ml-0.5" />
+              <Send className="w-4 h-4 sm:w-5 sm:h-5 ml-0.5" />
             </button>
           </form>
         </div>
+          </>
+        )}
 
       </main>
 
