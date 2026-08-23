@@ -2,10 +2,8 @@
 
 # ChatApp — Real-Time Messaging Platform
 
-A full-stack, low-latency chat application built with Next.js 16, Bun, PostgreSQL (Drizzle ORM), and Socket.IO.  
-Designed for 24/7 production uptime with zero cold starts, self-hosted on Oracle Cloud Infrastructure and Vercel.
-
-[**Explore Live Demo**](https://chat-application-mocha-xi.vercel.app) • [**Backend Health Check**](http://xvg69sogcx42p7o5ewsxh84m.144.24.112.62.sslip.io/health)
+A full-stack, low-latency messaging platform built with Next.js 16, Bun, PostgreSQL (Drizzle ORM), and Socket.IO.  
+Hosted 24/7 with zero sleep timers on Oracle Cloud Always Free Infrastructure and Vercel.
 
 <br/>
 
@@ -17,7 +15,22 @@ Designed for 24/7 production uptime with zero cold starts, self-hosted on Oracle
 [![Drizzle ORM](https://img.shields.io/badge/Drizzle-0.45-C5F74F?style=flat-square&logo=drizzle&logoColor=black)](https://orm.drizzle.team/)
 [![Socket.IO](https://img.shields.io/badge/Socket.IO-4.8-010101?style=flat-square&logo=socket.io)](https://socket.io/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+
+[![Oracle Cloud](https://img.shields.io/badge/Oracle_Cloud-Always_Free_VPS-F80000?style=flat-square&logo=oracle&logoColor=white)](https://www.oracle.com/cloud/free/)
+[![Coolify](https://img.shields.io/badge/Coolify-Self--Hosted_PaaS-6B21A8?style=flat-square&logo=docker&logoColor=white)](https://coolify.io/)
+[![Supabase](https://img.shields.io/badge/Supabase-Managed_Postgres-3ECF8E?style=flat-square&logo=supabase&logoColor=white)](https://supabase.com/)
+[![Vercel](https://img.shields.io/badge/Vercel-Edge_CDN-000000?style=flat-square&logo=vercel&logoColor=white)](https://vercel.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
+
+<br/>
+<br/>
+
+**[ 🚀 Live Demo ](https://chat-application-mocha-xi.vercel.app)** &nbsp;•&nbsp; **[ ⚡ API Health Check ](http://xvg69sogcx42p7o5ewsxh84m.144.24.112.62.sslip.io/health)** &nbsp;•&nbsp; **[ 🧪 Run Tests ](#testing)** &nbsp;•&nbsp; **[ 📦 Quickstart ](#getting-started)** &nbsp;•&nbsp; **[ 🏗️ Architecture ](#architecture--engineering-decisions)**
+
+<br/>
+<br/>
+
+<img src="./preview.png" alt="ChatApp Live Interface Preview" width="880" style="border-radius: 8px; border: 1px solid #334155; box-shadow: 0 10px 30px rgba(0,0,0,0.5);" />
 
 </div>
 
