@@ -1,6 +1,6 @@
 import { eq, and, inArray } from 'drizzle-orm';
 import { db } from '../config/db';
-import { conversations, conversationParticipants, Conversation, NewConversation } from '../db/schema';
+import { conversations, conversationParticipants, messages, Conversation, NewConversation } from '../db/schema';
 
 export class ConversationRepository {
   async findUserConversations(userId: string) {
@@ -106,7 +106,6 @@ export class ConversationRepository {
   }
 
   async clearMessages(conversationId: string): Promise<void> {
-    await db.delete(messages).where(eq(messages.conversationId, conversationId));
     await db
       .update(conversations)
       .set({
@@ -114,6 +113,8 @@ export class ConversationRepository {
         updatedAt: new Date()
       })
       .where(eq(conversations.id, conversationId));
+
+    await db.delete(messages).where(eq(messages.conversationId, conversationId));
   }
 
   async updateLastMessage(conversationId: string, messageId: string | null): Promise<void> {
