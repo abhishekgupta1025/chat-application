@@ -54,6 +54,21 @@ export class UserRepository {
       columns: { id: true, username: true }
     });
   }
+
+  async deleteById(id: string): Promise<boolean> {
+    const deleted = await db.delete(users).where(eq(users.id, id)).returning();
+    return deleted.length > 0;
+  }
+
+  async deleteTestUsers(): Promise<number> {
+    const testPatterns = ['alpha_%', 'beta_%', 'gamma_%', 'live_%', 'chk_%', 'test_%', 'live_alice_%', 'live_bob_%', 'prod_%'];
+    let count = 0;
+    for (const pattern of testPatterns) {
+      const deleted = await db.delete(users).where(ilike(users.username, pattern)).returning({ id: users.id });
+      count += deleted.length;
+    }
+    return count;
+  }
 }
 
 export const userRepository = new UserRepository();

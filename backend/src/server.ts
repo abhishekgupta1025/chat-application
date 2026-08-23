@@ -11,6 +11,7 @@ import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
 import conversationRoutes from './routes/conversations';
 import messageRoutes from './routes/messages';
+import adminRoutes from './routes/admin';
 
 import { socketAuthMiddleware } from './middleware/socketAuth';
 import { errorHandler } from './middleware/errorHandler';
@@ -42,6 +43,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check endpoint (Used by Render / Railway / Uptime Robot to keep server alive)
 app.get('/health', (_req, res) => {

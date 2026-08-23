@@ -1,5 +1,6 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { messageService } from '../services/messageService';
+import { conversationService } from '../services/conversationService';
 import { AuthenticatedSocket } from '../middleware/socketAuth';
 
 // In-Memory state for live presence tracking (can be backed by Redis at scale)
@@ -131,6 +132,62 @@ export const setupSocketServer = (io: SocketIOServer): void => {
         });
       } catch (error) {
         console.error('Error marking messages as read:', error);
+      }
+    });
+
+    // =========================================================================
+    // EVENT: DELETE MESSAGE (Delete For Everyone)
+    // =========================================================================
+    socket.on('delete_message', async (data: { messageId: string; conversationId: string }) => {
+      try {
+        const { messageId, conversationId } = data;
+        if (!messageId || !conversationId) return;
+
+        await messageService.deleteMessage(messageId, userId);
+
+        const roomName = `conv_${conversationId}`;
+        io.to(roomName).emit('message_deleted', {
+          messageId,
+          conversationId
+        });
+      } catch (error: any) {
+        socket.emit('error_message', { error: error.message || 'Failed to delete message' });
+      }
+    });
+
+    // =========================================================================
+    // EVENT: CLEAR CHAT
+    // =========================================================================
+    socket.on('clear_chat', async (conversationId: string) => {
+      try {
+        if (!conversationId) return;
+
+        await conversationService.clearConversationMessages(conversationId, userId);
+
+        const roomName = `conv_${conversationId}`;
+        io.to(roomName).emit('chat_cleared', {
+          conversationId
+        });
+      } catch (error: any) {
+        socket.emit('error_message', { error: error.message || 'Failed to clear chat' });
+      }
+    });
+
+    // =========================================================================
+    // EVENT: DELETE CONVERSATION
+    // =========================================================================
+    socket.on('delete_conversation', async (conversationId: string) => {
+      try {
+        if (!conversationId) return;
+
+        await conversationService.deleteConversation(conversationId, userId);
+
+        const roomName = `conv_${conversationId}`;
+        io.to(roomName).emit('conversation_deleted', {
+          conversationId
+        });
+      } catch (error: any) {
+        socket.emit('error_message', { error: error.message || 'Failed to delete conversation' });
       }
     });
 

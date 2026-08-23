@@ -34,7 +34,9 @@ import {
   Phone,
   Video,
   MoreVertical,
-  Paperclip
+  Paperclip,
+  Trash2,
+  Eraser
 } from 'lucide-react';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
@@ -211,6 +213,22 @@ export default function ChatPage() {
       });
     });
 
+    socketClient.on('message_deleted', (payload: { messageId: string; conversationId: string }) => {
+      setMessages((prev) => prev.filter((m) => (m._id || m.id) !== payload.messageId));
+    });
+
+    socketClient.on('chat_cleared', (payload: { conversationId: string }) => {
+      setMessages([]);
+      setConversations((prev) =>
+        prev.map((c) => ((c._id || c.id) === payload.conversationId ? { ...c, lastMessage: null } : c))
+      );
+    });
+
+    socketClient.on('conversation_deleted', (payload: { conversationId: string }) => {
+      setConversations((prev) => prev.filter((c) => (c._id || c.id) !== payload.conversationId));
+      setActiveConversation((prev) => ((prev?._id || prev?.id) === payload.conversationId ? null : prev));
+    });
+
     return () => {
       socketClient.close();
     };
@@ -382,6 +400,81 @@ export default function ChatPage() {
   const handleLogout = () => {
     localStorage.clear();
     router.push('/login');
+  };
+
+  // ==============================================================================
+  // DELETION & STORAGE OPTIMIZATION HANDLERS
+  // ==============================================================================
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!confirm('Are you sure you want to delete this message for everyone?')) return;
+    const token = localStorage.getItem('token');
+    const convId = activeConversation?._id || activeConversation?.id;
+
+    // Optimistic UI Removal
+    setMessages((prev) => prev.filter((m) => (m._id || m.id) !== messageId));
+
+    try {
+      if (socket && isConnected) {
+        socket.emit('delete_message', { messageId, conversationId: convId });
+      } else {
+        await fetch(`${BACKEND_URL}/api/messages/${messageId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+    } catch (err) {
+      console.error('Failed to delete message:', err);
+    }
+  };
+
+  const handleClearChat = async () => {
+    if (!activeConversation) return;
+    const convId = activeConversation._id || activeConversation.id;
+    if (!confirm('Are you sure you want to clear all messages in this chat? This cannot be undone.')) return;
+
+    setMessages([]);
+    setConversations((prev) =>
+      prev.map((c) => ((c._id || c.id) === convId ? { ...c, lastMessage: null } : c))
+    );
+
+    try {
+      const token = localStorage.getItem('token');
+      if (socket && isConnected) {
+        socket.emit('clear_chat', convId);
+      } else {
+        await fetch(`${BACKEND_URL}/api/conversations/${convId}/messages`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+    } catch (err) {
+      console.error('Failed to clear chat history:', err);
+    }
+  };
+
+  const handleDeleteConversation = async () => {
+    if (!activeConversation) return;
+    const convId = activeConversation._id || activeConversation.id;
+    const isGroup = activeConversation.isGroup;
+    if (!confirm(`Are you sure you want to delete this ${isGroup ? 'group channel' : 'conversation'} permanently?`)) return;
+
+    setConversations((prev) => prev.filter((c) => (c._id || c.id) !== convId));
+    setActiveConversation(null);
+    setMessages([]);
+
+    try {
+      const token = localStorage.getItem('token');
+      if (socket && isConnected) {
+        socket.emit('delete_conversation', convId);
+      } else {
+        await fetch(`${BACKEND_URL}/api/conversations/${convId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+    } catch (err) {
+      console.error('Failed to delete conversation:', err);
+    }
   };
 
   // Helpers
@@ -741,6 +834,24 @@ export default function ChatPage() {
           </div>
 
           <div className="flex items-center gap-2 text-[#aebac1]">
+            {activeConversation && (
+              <>
+                <button
+                  onClick={handleClearChat}
+                  className="p-2 hover:bg-[#374248] rounded-full text-[#aebac1] hover:text-[#e9edef] transition-colors"
+                  title="Clear Chat History"
+                >
+                  <Eraser className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handleDeleteConversation}
+                  className="p-2 hover:bg-[#374248] rounded-full text-[#aebac1] hover:text-red-400 transition-colors"
+                  title="Delete Conversation"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </>
+            )}
             <span
               className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-[#00a884]' : 'bg-red-500 animate-pulse'}`}
               title={isConnected ? 'WSS Connected' : 'Disconnected'}
@@ -784,8 +895,19 @@ export default function ChatPage() {
               return (
                 <div
                   key={msgId}
-                  className={`flex ${isMine ? 'justify-end' : 'justify-start'} group`}
+                  className={`flex ${isMine ? 'justify-end' : 'justify-start'} group items-center gap-1.5`}
                 >
+                  {/* Delete Button on Hover for My Sent Messages (Left side of outgoing bubble) */}
+                  {isMine && (
+                    <button
+                      onClick={() => handleDeleteMessage(msgId)}
+                      className="opacity-0 group-hover:opacity-100 hover:text-red-400 p-1.5 text-[#8696a0] transition-opacity cursor-pointer rounded-full hover:bg-[#202c33]"
+                      title="Delete message for everyone"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
                   <div
                     className={`relative max-w-[80%] sm:max-w-[65%] px-3.5 py-2 rounded-2xl shadow-md text-sm leading-relaxed ${
                       isMine

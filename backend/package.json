@@ -10,7 +10,10 @@
     "build": "bun build ./src/server.ts --outdir ./dist --target node",
     "test": "bun test",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "cleanup": "bun run src/scripts/cleanup.ts",
+    "cleanup:30days": "bun run src/scripts/cleanup.ts --days 30",
+    "cleanup:all": "bun run src/scripts/cleanup.ts --all"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

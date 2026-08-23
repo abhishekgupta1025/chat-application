@@ -119,6 +119,48 @@ export class ConversationService {
       lastMessage: null
     };
   }
+
+  async clearConversationMessages(conversationId: string, userId: string): Promise<{ success: boolean; conversationId: string }> {
+    if (!conversationId) throw new BadRequestError('Conversation ID is required');
+
+    const isMember = await this.convRepo.isParticipant(conversationId, userId);
+    if (!isMember) {
+      throw new ForbiddenError('You are not a member of this conversation');
+    }
+
+    await this.convRepo.clearMessages(conversationId);
+
+    return {
+      success: true,
+      conversationId
+    };
+  }
+
+  async deleteConversation(conversationId: string, userId: string): Promise<{ success: boolean; conversationId: string }> {
+    if (!conversationId) throw new BadRequestError('Conversation ID is required');
+
+    const isMember = await this.convRepo.isParticipant(conversationId, userId);
+    if (!isMember) {
+      throw new ForbiddenError('You are not a member of this conversation');
+    }
+
+    const conv = await this.convRepo.findById(conversationId);
+    if (!conv) {
+      throw new BadRequestError('Conversation not found');
+    }
+
+    // If group with admin, only admin can delete
+    if (conv.isGroup && conv.adminId && conv.adminId !== userId) {
+      throw new ForbiddenError('Only group admins can delete group channels');
+    }
+
+    await this.convRepo.deleteById(conversationId);
+
+    return {
+      success: true,
+      conversationId
+    };
+  }
 }
 
 export const conversationService = new ConversationService();

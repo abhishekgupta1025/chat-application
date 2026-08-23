@@ -86,7 +86,37 @@ export class ConversationRepository {
     return !!membership;
   }
 
-  async updateLastMessage(conversationId: string, messageId: string): Promise<void> {
+  async findById(conversationId: string): Promise<Conversation | undefined> {
+    return await db.query.conversations.findFirst({
+      where: eq(conversations.id, conversationId),
+      with: {
+        participants: {
+          with: {
+            user: { columns: { id: true, username: true } }
+          }
+        },
+        lastMessage: true
+      }
+    });
+  }
+
+  async deleteById(conversationId: string): Promise<boolean> {
+    const deleted = await db.delete(conversations).where(eq(conversations.id, conversationId)).returning({ id: conversations.id });
+    return deleted.length > 0;
+  }
+
+  async clearMessages(conversationId: string): Promise<void> {
+    await db.delete(messages).where(eq(messages.conversationId, conversationId));
+    await db
+      .update(conversations)
+      .set({
+        lastMessageId: null,
+        updatedAt: new Date()
+      })
+      .where(eq(conversations.id, conversationId));
+  }
+
+  async updateLastMessage(conversationId: string, messageId: string | null): Promise<void> {
     await db
       .update(conversations)
       .set({

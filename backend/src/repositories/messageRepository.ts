@@ -26,6 +26,27 @@ export class MessageRepository {
     return list.reverse();
   }
 
+  async findById(messageId: string): Promise<Message | undefined> {
+    return await db.query.messages.findFirst({
+      where: eq(messages.id, messageId)
+    });
+  }
+
+  async deleteById(messageId: string): Promise<Message | null> {
+    const [deleted] = await db.delete(messages).where(eq(messages.id, messageId)).returning();
+    return deleted || null;
+  }
+
+  async deleteByConversation(conversationId: string): Promise<number> {
+    const deleted = await db.delete(messages).where(eq(messages.conversationId, conversationId)).returning({ id: messages.id });
+    return deleted.length;
+  }
+
+  async deleteOlderThan(cutoffDate: Date): Promise<number> {
+    const deleted = await db.delete(messages).where(lt(messages.createdAt, cutoffDate)).returning({ id: messages.id });
+    return deleted.length;
+  }
+
   async markAsRead(conversationId: string, userId: string): Promise<void> {
     const convMessages = await db.query.messages.findMany({
       where: eq(messages.conversationId, conversationId),
