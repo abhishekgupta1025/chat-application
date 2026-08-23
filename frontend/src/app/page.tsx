@@ -39,7 +39,10 @@ import {
   Eraser
 } from 'lucide-react';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+const RAW_BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://xvg69sogcx42p7o5ewsxh84m.144.24.112.62.sslip.io';
+const BACKEND_URL = typeof window !== 'undefined' && window.location.protocol === 'https:'
+  ? RAW_BACKEND_URL.replace(/^http:\/\//i, 'https://')
+  : RAW_BACKEND_URL;
 
 const POPULAR_EMOJIS = ['👍', '❤️', '🔥', '😂', '🎉', '🚀', '👏', '✨', '💯', '🙏', '😍', '👋'];
 
