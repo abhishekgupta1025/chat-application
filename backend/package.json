@@ -1,0 +1,37 @@
+{
+  "name": "backend",
+  "version": "3.0.0",
+  "description": "Real-Time Chat Application Backend powered by Bun, PostgreSQL, Drizzle ORM, Express, and Socket.IO",
+  "main": "src/server.ts",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/server.ts",
+    "start": "bun src/server.ts",
+    "build": "bun build ./src/server.ts --outdir ./dist --target node",
+    "test": "bun test",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "postgres": "^3.4.9",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^3.0.0",
+    "@types/bun": "^1.4.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^26.2.0",
+    "bun-types": "^1.4.0",
+    "drizzle-kit": "^0.31.10",
+    "socket.io-client": "^4.8.3",
+    "typescript": "^7.0.2"
+  }
+}
