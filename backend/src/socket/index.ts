@@ -8,20 +8,38 @@ import { AuthenticatedSocket } from '../middleware/socketAuth';
 // Maps userId -> Set of active socket IDs (allows multiple browser tabs)
 const onlineUsers = new Map<string, Set<string>>();
 
-// Bounded cache of conversationId -> participant userIds to scope conversation_updated
-const participantCache = new Map<string, string[]>();
-const MAX_PARTICIPANT_CACHE = 5000;
+// Bounded LRU + TTL cache of conversationId -> participant userIds to scope conversation_updated
+const participantCache = new Map<string, { ids: string[]; expiresAt: number }>();
+const MAX_PARTICIPANT_CACHE = 2000;
+const PARTICIPANT_CACHE_TTL_MS = 5 * 60_000;
+
+export function invalidateParticipantCache(conversationId: string): void {
+  participantCache.delete(conversationId);
+}
 
 async function getParticipantUserRooms(conversationId: string): Promise<string[]> {
-  let participantIds = participantCache.get(conversationId);
-  if (!participantIds) {
+  const now = Date.now();
+  const cached = participantCache.get(conversationId);
+  let participantIds: string[];
+
+  if (cached && cached.expiresAt > now) {
+    // Refresh LRU recency
+    participantCache.delete(conversationId);
+    participantCache.set(conversationId, cached);
+    participantIds = cached.ids;
+  } else {
+    if (cached) participantCache.delete(conversationId);
     participantIds = await conversationRepository.findParticipantIds(conversationId);
     if (participantCache.size >= MAX_PARTICIPANT_CACHE) {
       const oldestKey = participantCache.keys().next().value;
       if (oldestKey) participantCache.delete(oldestKey);
     }
-    participantCache.set(conversationId, participantIds);
+    participantCache.set(conversationId, {
+      ids: participantIds,
+      expiresAt: now + PARTICIPANT_CACHE_TTL_MS
+    });
   }
+
   return participantIds.map((id) => `user_${id}`);
 }
 

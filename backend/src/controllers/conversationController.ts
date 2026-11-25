@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { conversationService, ConversationService } from '../services/conversationService';
 import { AuthRequest } from '../middleware/auth';
+import { invalidateParticipantCache } from '../socket';
 
 export class ConversationController {
   constructor(private service: ConversationService = conversationService) {}
@@ -53,6 +54,7 @@ export class ConversationController {
       const currentUserId = req.user?.userId;
       const conversationId = req.params.id as string;
       const result = await this.service.deleteConversation(conversationId, currentUserId!);
+      invalidateParticipantCache(conversationId);
       res.json(result);
     } catch (error) {
       next(error);
