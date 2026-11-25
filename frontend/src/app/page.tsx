@@ -37,6 +37,8 @@ export default function ChatPage() {
 
   const activeConversationRef = useRef<Conversation | null>(null);
   activeConversationRef.current = activeConversation;
+  const conversationsRef = useRef<Conversation[]>([]);
+  conversationsRef.current = conversations;
   const currentUserIdRef = useRef<string>('');
   currentUserIdRef.current = currentUserId;
 
@@ -200,42 +202,56 @@ export default function ChatPage() {
       );
     });
 
-    socketClient.on('conversation_updated', (payload: { conversationId: string; lastMessage: Message | null }) => {
-      const activeConvId = getConversationId(activeConversationRef.current);
-      let foundInState = true;
+    socketClient.on(
+      'conversation_updated',
+      (payload: { conversationId: string; lastMessage: Message | null; isDeletion?: boolean }) => {
+        const activeConvId = getConversationId(activeConversationRef.current);
+        const existsLocally = conversationsRef.current.some(
+          (c) => getConversationId(c) === payload.conversationId
+        );
 
-      setConversations((prev) => {
-        const index = prev.findIndex((c) => getConversationId(c) === payload.conversationId);
-        if (index === -1) {
-          foundInState = false;
-          return prev;
+        if (!existsLocally) {
+          void refreshConversations();
+          return;
         }
-        const updated = [...prev];
-        const [moved] = updated.splice(index, 1);
-        const isIncomingUnread =
-          payload.conversationId !== activeConvId &&
-          Boolean(payload.lastMessage) &&
-          payload.lastMessage?.sender !== currentUserIdRef.current &&
-          moved.lastMessage?._id !== payload.lastMessage?._id;
 
-        updated.unshift({
-          ...moved,
-          lastMessage: payload.lastMessage,
-          unreadCount:
-            payload.conversationId === activeConvId
-              ? 0
-              : isIncomingUnread
-              ? (moved.unreadCount ?? 0) + 1
-              : moved.unreadCount,
-          updatedAt: payload.lastMessage?.createdAt || new Date().toISOString()
+        setConversations((prev) => {
+          const index = prev.findIndex((c) => getConversationId(c) === payload.conversationId);
+          if (index === -1) return prev;
+          const updated = [...prev];
+          const [moved] = updated.splice(index, 1);
+
+          const prevTime = moved.lastMessage?.createdAt
+            ? new Date(moved.lastMessage.createdAt).getTime()
+            : 0;
+          const nextTime = payload.lastMessage?.createdAt
+            ? new Date(payload.lastMessage.createdAt).getTime()
+            : 0;
+
+          const isIncomingUnread =
+            !payload.isDeletion &&
+            payload.conversationId !== activeConvId &&
+            Boolean(payload.lastMessage) &&
+            payload.lastMessage?.sender !== currentUserIdRef.current &&
+            (moved.lastMessage?._id || moved.lastMessage?.id) !==
+              (payload.lastMessage?._id || payload.lastMessage?.id) &&
+            nextTime >= prevTime;
+
+          updated.unshift({
+            ...moved,
+            lastMessage: payload.lastMessage,
+            unreadCount:
+              payload.conversationId === activeConvId
+                ? 0
+                : isIncomingUnread
+                ? (moved.unreadCount ?? 0) + 1
+                : moved.unreadCount,
+            updatedAt: payload.lastMessage?.createdAt || moved.updatedAt
+          });
+          return updated;
         });
-        return updated;
-      });
-
-      if (!foundInState) {
-        void refreshConversations();
       }
-    });
+    );
 
     socketClient.on('user_typing', (data: { conversationId: string; userId: string; username: string }) => {
       setIsTypingMap((prev) => ({ ...prev, [data.conversationId]: data.username }));

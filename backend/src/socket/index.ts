@@ -242,7 +242,8 @@ export const setupSocketServer = (io: SocketIOServer): void => {
         if (targetRooms.length > 0) {
           io.to(targetRooms).emit('conversation_updated', {
             conversationId,
-            lastMessage: result.lastMessage
+            lastMessage: result.lastMessage,
+            isDeletion: true
           });
         }
       } catch (error: any) {
