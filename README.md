@@ -268,11 +268,51 @@ Ran 26 tests across 6 files. [100% pass rate]
 
 ---
 
+## Load Testing & Performance Engineering
+
+Benchmarked end-to-end from a separate client machine using a custom Bun + `socket.io-client` step-ramp harness against the live **Oracle Cloud Always Free x86 VM** (`VM.Standard.E2.1.Micro`, 1/8 OCPU, `952 MiB` RAM + `2 GiB` swap, `ap-mumbai-1`) backed by **Supabase Free Tier PostgreSQL** (`ap-south-1` transaction pooler, port `6543`).
+
+### 4 Bottlenecks Diagnosed & Fixed
+1. **Eliminated $O(N^2)$ `online_users` connect/disconnect storm:** Replaced per-event global `io.emit('online_users', ...)` with an immediate snapshot to the connecting socket plus a `2000 ms` throttled broadcast.
+2. **Scoped `conversation_updated` to participant rooms:** Joined each socket to `user_${userId}` and routed `conversation_updated` exclusively to that conversation's participants (backed by a bounded LRU + 5-min TTL cache) instead of global $O(N)$ fan-out.
+3. **Merged sequential message writes into 1 SQL CTE:** Combined `INSERT INTO messages ... RETURNING` and `UPDATE conversations SET last_message_id` into a single PostgreSQL round-trip (`createAndTouchConversation`) with `max: 15` pool connections.
+4. **Fixed Supabase Transaction Pooler prepared-statement crash:** Diagnosed a `postgres.js` `DataRow` crash (`query.statement.columns` undefined at 500 users) caused by prepared statements colliding across Supavisor transaction-mode multiplexing; resolved via `prepare: false` + 1s event-loop lag telemetry on `/health`.
+
+### Before vs. After (1:1 Direct Chats, 5s msg interval/user)
+
+| Concurrent Users | Msgs/s | Before p95 | After p95 | Before Err % | After Err % | Status |
+| :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| **50** | 10.0 | 222.1 ms | **147.9 ms** | 0.00% | 0.00% | -33% p95 |
+| **100** | 20.0 | 217.9 ms | **147.7 ms** | 1.00% | **0.00%** | -32% p95, 0% err |
+| **200** | 40.0 | 4618.3 ms *(STOPPED)* | **156.9 ms** | 0.00% | **0.00%** | **-96.6% p95 (29.4× faster)** |
+| **350** | 70.0 | *Not reached* | **159.9 ms** | — | **0.00%** | PASS |
+| **500** | 99.4–100.0 | *Not reached* | **224.3–227.5 ms** | — | **0.00–0.60%** | PASS (`0 MiB` swap used) |
+| **750** *(Ceiling)* | 149.4 | *Not reached* | 2021.7 ms | — | **0.00%** | Safety stop (`457 MiB` RAM, `0 MiB` swap) |
+
+### Group-Chat Room Fan-Out (`--mode group --group-size 10`, 50 Groups)
+
+| Concurrent Users | Msgs/s | Room Deliveries/s | p50 ms | p95 ms | p99 ms | Err % |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **100** | 20.0 | ~200/s | 133.5 | 177.5 | 206.2 | 0.00% |
+| **250** | 50.0 | ~500/s | 136.5 | 191.0 | 211.3 | 0.40% |
+| **500** | 99.6 | ~996/s | 136.5 | **242.6** | 935.4 | 0.20% |
+
+```mermaid
+xychart-beta
+    title "ChatApp p95 Latency Scaling: Before vs After (ms)"
+    x-axis ["50 users", "100 users", "200 users", "350 users", "500 users"]
+    y-axis "p95 Latency (ms)" 0 --> 4800
+    bar [222.1, 217.9, 4618.3, 0, 0]
+    line [147.9, 147.7, 156.9, 159.9, 224.3]
+```
+
+---
+
 ## Deployment Architecture
 
 - **Frontend**: Hosted on **Vercel** with automatic Git deployments and global Edge CDN caching.
-- **Backend**: Containerized via Docker (`oven/bun:1-slim`) and managed through **Coolify** on an **Oracle Cloud Always Free VM** (Ubuntu 24.04 LTS, 4 ARM OCPUs, 24 GB RAM).
-- **Database**: **Supabase Managed PostgreSQL** connected over IPv4 pooler transaction mode.
+- **Backend**: Live on an **Oracle Cloud Always Free VM** (`VM.Standard.E2.1.Micro`, Ubuntu 24.04.5 LTS x86_64, 1/8 OCPU, `952 MiB` RAM + `2 GiB` swap) running **Native Bun `1.4.5` (`systemd`)** behind **Caddy `v2.11.9`** automatic HTTPS/WSS (`backend/Dockerfile` & `docker-compose.yml` also included for containerized deployments).
+- **Database**: **Supabase Managed PostgreSQL** connected over IPv4 pooler transaction mode (`port 6543`, `prepare: false`).
 
 ---
 
