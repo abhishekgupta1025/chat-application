@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import express from 'express';
 import adminRouter from '../routes/admin';
+import { authenticateToken } from '../middleware/auth';
 import { errorHandler } from '../middleware/errorHandler';
 import { MessageService } from '../services/messageService';
 import { ConversationService } from '../services/conversationService';
@@ -90,5 +91,71 @@ describe('Security, Authorization & Validation Regression Suite', () => {
     errorHandler(pgErr, {} as any, mockRes, () => {});
     expect(statusCode).toBe(400);
     expect(body?.success).toBe(false);
+  });
+
+  it('authenticateToken should return 401 (not 403) for invalid or expired JWTs', () => {
+    let statusCode = 0;
+    let body: any = null;
+    const mockReq = { headers: { authorization: 'Bearer invalid.jwt.token' } } as any;
+    const mockRes = {
+      status(code: number) {
+        statusCode = code;
+        return this;
+      },
+      json(payload: any) {
+        body = payload;
+        return this;
+      }
+    } as any;
+
+    authenticateToken(mockReq, mockRes, () => {});
+    expect(statusCode).toBe(401);
+    expect(body?.error).toContain('Invalid or expired');
+  });
+
+  it('MessageService.deleteMessage should return updated lastMessage for sidebar sync', async () => {
+    const validConvId = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
+    const validUserId = 'b1ffcd88-8b0a-3ef7-aa5c-5aa8ac270b22';
+    const validMsgId = 'c2ffcd88-8b0a-3ef7-aa5c-5aa8ac270b33';
+    const prevMsg = {
+      id: 'd3ffcd88-8b0a-3ef7-aa5c-5aa8ac270b44',
+      conversationId: validConvId,
+      senderId: validUserId,
+      senderName: 'alice',
+      text: 'earlier message',
+      status: 'read',
+      createdAt: new Date()
+    };
+
+    const msgSvc = new MessageService(
+      {
+        findById: async () => ({ id: validMsgId, conversationId: validConvId, senderId: validUserId }),
+        deleteById: async () => ({}),
+        findByConversation: async () => [prevMsg]
+      } as any,
+      { updateLastMessage: async () => {} } as any
+    );
+
+    const res = await msgSvc.deleteMessage(validMsgId, validUserId);
+    expect(res.success).toBe(true);
+    expect(res.lastMessage?.id).toBe(prevMsg.id);
+    expect(res.lastMessage?.text).toBe('earlier message');
+  });
+
+  it('ConversationService.getUserConversations should attach unreadCount per conversation', async () => {
+    const convId = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
+    const userId = 'b1ffcd88-8b0a-3ef7-aa5c-5aa8ac270b22';
+    const convSvc = new ConversationService(
+      {
+        findUserConversations: async () => [
+          { id: convId, isGroup: false, name: null, adminId: null, updatedAt: new Date(), createdAt: new Date(), participants: [], lastMessage: null }
+        ],
+        countUnreadByConversation: async () => new Map([[convId, 4]])
+      } as any,
+      {} as any
+    );
+
+    const list = await convSvc.getUserConversations(userId);
+    expect(list[0].unreadCount).toBe(4);
   });
 });

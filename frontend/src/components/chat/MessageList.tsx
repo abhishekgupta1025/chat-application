@@ -4,6 +4,7 @@ import React, { useRef, useEffect } from 'react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
+  AlertCircle,
   Check,
   CheckCheck,
   ChevronLeft,
@@ -12,7 +13,8 @@ import {
   Hash,
   Lock,
   MessageSquare,
-  Trash2
+  Trash2,
+  X
 } from 'lucide-react';
 import {
   Conversation,
@@ -34,6 +36,8 @@ interface MessageListProps {
   typingUsername?: string;
   hasMoreMessages: boolean;
   isLoadingOlder: boolean;
+  errorMessage: string | null;
+  onDismissError: () => void;
   onLoadOlderMessages: () => void;
   onBack: () => void;
   onClearChat: () => void;
@@ -50,6 +54,8 @@ export const MessageList = React.memo(function MessageList({
   typingUsername,
   hasMoreMessages,
   isLoadingOlder,
+  errorMessage,
+  onDismissError,
   onLoadOlderMessages,
   onBack,
   onClearChat,
@@ -94,6 +100,10 @@ export const MessageList = React.memo(function MessageList({
   })();
 
   const activeConvId = getConversationId(activeConversation);
+  const canDeleteConversation =
+    !activeConversation.isGroup ||
+    !activeConversation.adminId ||
+    activeConversation.adminId === currentUserId;
 
   return (
     <>
@@ -139,19 +149,37 @@ export const MessageList = React.memo(function MessageList({
           >
             <Eraser className="w-4 h-4" />
           </button>
-          <button
-            onClick={onDeleteConversation}
-            className="p-2 hover:bg-[#374248] rounded-full text-[#aebac1] hover:text-red-400 transition-colors"
-            title="Delete Conversation"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          {canDeleteConversation && (
+            <button
+              onClick={onDeleteConversation}
+              className="p-2 hover:bg-[#374248] rounded-full text-[#aebac1] hover:text-red-400 transition-colors"
+              title="Delete Conversation"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
           <span
             className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-[#00a884]' : 'bg-red-500 animate-pulse'} ml-1`}
             title={isConnected ? 'WSS Connected' : 'Disconnected'}
           />
         </div>
       </header>
+
+      {errorMessage && (
+        <div className="px-4 py-2 bg-red-950/70 border-b border-red-800/60 text-red-200 text-xs flex items-center justify-between gap-2 flex-none">
+          <span className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-red-400 flex-none" />
+            {errorMessage}
+          </span>
+          <button
+            onClick={onDismissError}
+            className="p-1 hover:bg-red-900/60 rounded text-red-300"
+            title="Dismiss error"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Message Feed Canvas */}
       <ScrollArea className="flex-1 px-4 sm:px-12 py-4 bg-[#0b141a]" key={activeConvId}>

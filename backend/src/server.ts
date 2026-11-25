@@ -5,7 +5,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { env } from './config/env';
 
-import { connectDB } from './config/db';
+import { connectDB, pgClient } from './config/db';
 import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
 import conversationRoutes from './routes/conversations';
@@ -50,7 +50,7 @@ app.use('/api/admin', adminRoutes);
 let eventLoopLagMs = 0;
 let maxEventLoopLagMs = 0;
 let lastTick = performance.now();
-setInterval(() => {
+const lagInterval = setInterval(() => {
   const now = performance.now();
   const lag = Math.max(0, now - lastTick - 1000);
   lastTick = now;
@@ -61,7 +61,8 @@ setInterval(() => {
   if (lag > 100) {
     console.warn(`⚠️ Event-loop lag spike: ${eventLoopLagMs}ms`);
   }
-}, 1000).unref();
+}, 1000);
+lagInterval.unref();
 
 // Health check endpoint (Used by Render / Railway / Uptime Robot to keep server alive)
 app.get('/health', (_req, res) => {
@@ -97,7 +98,35 @@ setupSocketServer(io);
 // Connect to PostgreSQL Database
 connectDB();
 
-const PORT = process.env.PORT || 5000;
+const PORT = env.port;
 server.listen(PORT, () => {
   console.log(`🚀 Chat Backend running via Bun on http://localhost:${PORT}`);
 });
+
+let isShuttingDown = false;
+async function gracefulShutdown(signal: string): Promise<void> {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  console.log(`🛑 Received ${signal}, closing HTTP/Socket servers and database pool...`);
+  clearInterval(lagInterval);
+
+  const forceTimer = setTimeout(() => {
+    console.error('⏱️ Graceful shutdown timed out, forcing exit.');
+    process.exit(1);
+  }, 8000);
+  forceTimer.unref();
+
+  try {
+    await new Promise<void>((resolve) => io.close(() => resolve()));
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await pgClient.end({ timeout: 5 });
+    console.log('✅ Graceful shutdown complete.');
+    process.exit(0);
+  } catch (err) {
+    console.error('❌ Error during graceful shutdown:', err);
+    process.exit(1);
+  }
+}
+
+process.on('SIGTERM', () => void gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => void gracefulShutdown('SIGINT'));

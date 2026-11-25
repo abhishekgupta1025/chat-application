@@ -322,23 +322,30 @@ export const ChatSidebar = React.memo(function ChatSidebar({
                       </span>
                     </div>
 
-                    <p className="text-xs truncate text-[#8696a0]">
-                      {isTyping ? (
-                        <span className="text-[#00a884] font-medium flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#00a884] animate-pulse" />
-                          {isTyping} is typing...
-                        </span>
-                      ) : conv.lastMessage ? (
-                        <span className="truncate">
-                          <span className="text-[#e9edef]/80 font-medium">
-                            {conv.lastMessage.sender === currentUserId ? 'You: ' : `${conv.lastMessage.senderName}: `}
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs truncate text-[#8696a0]">
+                        {isTyping ? (
+                          <span className="text-[#00a884] font-medium flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#00a884] animate-pulse" />
+                            {isTyping} is typing...
                           </span>
-                          {conv.lastMessage.text}
+                        ) : conv.lastMessage ? (
+                          <span className="truncate">
+                            <span className="text-[#e9edef]/80 font-medium">
+                              {conv.lastMessage.sender === currentUserId ? 'You: ' : `${conv.lastMessage.senderName}: `}
+                            </span>
+                            {conv.lastMessage.text}
+                          </span>
+                        ) : (
+                          <span className="italic text-[#8696a0]/80">Tap to start chatting</span>
+                        )}
+                      </p>
+                      {!isActive && (conv.unreadCount ?? 0) > 0 && (
+                        <span className="flex-none min-w-5 h-5 px-1.5 rounded-full bg-[#00a884] text-[#111b21] text-[11px] font-bold flex items-center justify-center">
+                          {(conv.unreadCount ?? 0) > 99 ? '99+' : conv.unreadCount}
                         </span>
-                      ) : (
-                        <span className="italic text-[#8696a0]/80">Tap to start chatting</span>
                       )}
-                    </p>
+                    </div>
                   </div>
                 </div>
               );

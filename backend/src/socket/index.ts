@@ -230,13 +230,21 @@ export const setupSocketServer = (io: SocketIOServer): void => {
         const { messageId, conversationId } = data;
         if (!messageId || !conversationId) return;
 
-        await messageService.deleteMessage(messageId, userId);
+        const result = await messageService.deleteMessage(messageId, userId);
 
         const roomName = `conv_${conversationId}`;
         io.to(roomName).emit('message_deleted', {
           messageId,
           conversationId
         });
+
+        const targetRooms = await getParticipantUserRooms(conversationId);
+        if (targetRooms.length > 0) {
+          io.to(targetRooms).emit('conversation_updated', {
+            conversationId,
+            lastMessage: result.lastMessage
+          });
+        }
       } catch (error: any) {
         socket.emit('error_message', { error: error.message || 'Failed to delete message' });
       }

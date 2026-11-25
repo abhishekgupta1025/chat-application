@@ -1,8 +1,28 @@
 import { eq, and, inArray } from 'drizzle-orm';
-import { db } from '../config/db';
+import { db, pgClient } from '../config/db';
 import { conversations, conversationParticipants, messages, Conversation, NewConversation } from '../db/schema';
 
 export class ConversationRepository {
+  async countUnreadByConversation(userId: string): Promise<Map<string, number>> {
+    const rows = await pgClient<Array<{ conversationId: string; unreadCount: number }>>`
+      SELECT m.conversation_id AS "conversationId", COUNT(*)::int AS "unreadCount"
+      FROM messages m
+      INNER JOIN conversation_participants cp
+        ON cp.conversation_id = m.conversation_id AND cp.user_id = ${userId}
+      WHERE m.sender_id <> ${userId}
+        AND NOT EXISTS (
+          SELECT 1
+          FROM message_reads mr
+          WHERE mr.message_id = m.id AND mr.user_id = ${userId}
+        )
+      GROUP BY m.conversation_id
+    `;
+    const map = new Map<string, number>();
+    for (const r of rows) {
+      map.set(r.conversationId, Number(r.unreadCount) || 0);
+    }
+    return map;
+  }
   async findUserConversations(userId: string) {
     const memberships = await db.query.conversationParticipants.findMany({
       where: eq(conversationParticipants.userId, userId),

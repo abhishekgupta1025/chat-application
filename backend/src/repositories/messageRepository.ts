@@ -89,23 +89,28 @@ export class MessageRepository {
 
   async markAsRead(conversationId: string, userId: string): Promise<void> {
     await pgClient`
-      WITH unread AS (
-        SELECT id
-        FROM messages
-        WHERE conversation_id = ${conversationId}
-          AND sender_id <> ${userId}
-          AND status <> 'read'
+      WITH to_read AS (
+        SELECT m.id
+        FROM messages m
+        WHERE m.conversation_id = ${conversationId}
+          AND m.sender_id <> ${userId}
+          AND NOT EXISTS (
+            SELECT 1
+            FROM message_reads mr
+            WHERE mr.message_id = m.id AND mr.user_id = ${userId}
+          )
       ),
       inserted_reads AS (
         INSERT INTO message_reads (message_id, user_id)
         SELECT id, ${userId}
-        FROM unread
+        FROM to_read
         ON CONFLICT DO NOTHING
       )
       UPDATE messages
       SET status = 'read',
           updated_at = NOW()
-      WHERE id IN (SELECT id FROM unread)
+      WHERE id IN (SELECT id FROM to_read)
+        AND status <> 'read'
     `;
   }
 }

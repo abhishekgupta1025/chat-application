@@ -33,6 +33,7 @@ export default function ChatPage() {
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
   const [isTypingMap, setIsTypingMap] = useState<Record<string, string>>({});
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const activeConversationRef = useRef<Conversation | null>(null);
   activeConversationRef.current = activeConversation;
@@ -43,6 +44,10 @@ export default function ChatPage() {
     localStorage.clear();
     router.push('/login');
   }, [router]);
+
+  const showError = useCallback((msg: string) => {
+    setErrorMessage(msg);
+  }, []);
 
   const authFetch = useCallback(
     async (path: string, init: RequestInit = {}): Promise<Response | null> => {
@@ -60,15 +65,37 @@ export default function ChatPage() {
         }
       });
 
-      if (res.status === 401 || res.status === 403) {
+      if (res.status === 401) {
         handleSessionExpired();
+        return null;
+      }
+
+      if (res.status === 403) {
+        try {
+          const body = await res.clone().json();
+          showError(body?.error || 'Permission denied');
+        } catch {
+          showError('Permission denied');
+        }
         return null;
       }
 
       return res;
     },
-    [handleSessionExpired]
+    [handleSessionExpired, showError]
   );
+
+  const refreshConversations = useCallback(async () => {
+    try {
+      const res = await authFetch('/api/conversations');
+      if (res?.ok) {
+        const convData: Conversation[] = await res.json();
+        setConversations(convData);
+      }
+    } catch (err) {
+      console.error('Failed to refresh conversations:', err);
+    }
+  }, [authFetch]);
 
   // ============================================================================
   // 1. BOOTSTRAP & REAL-TIME SOCKET
@@ -94,7 +121,7 @@ export default function ChatPage() {
         ]);
 
         if (convRes?.ok) {
-          const convData = await convRes.json();
+          const convData: Conversation[] = await convRes.json();
           setConversations(convData);
           if (convData.length > 0 && typeof window !== 'undefined' && window.innerWidth >= 768) {
             setActiveConversation(convData[0]);
@@ -133,6 +160,13 @@ export default function ChatPage() {
       setOnlineUserSet(new Set(userIds));
     });
 
+    socketClient.on('error_message', (payload: { error?: string }) => {
+      // Clear any stuck optimistic 'sending' indicators
+      setMessages((prev) => prev.filter((m) => m.status !== 'sending'));
+      showError(payload?.error || 'Action failed');
+      void refreshConversations();
+    });
+
     socketClient.on('receive_message', (payload: { message: Message; tempId?: string }) => {
       const { message, tempId } = payload;
       const activeConvId = getConversationId(activeConversationRef.current);
@@ -166,19 +200,41 @@ export default function ChatPage() {
       );
     });
 
-    socketClient.on('conversation_updated', (payload: { conversationId: string; lastMessage: Message }) => {
+    socketClient.on('conversation_updated', (payload: { conversationId: string; lastMessage: Message | null }) => {
+      const activeConvId = getConversationId(activeConversationRef.current);
+      let foundInState = true;
+
       setConversations((prev) => {
         const index = prev.findIndex((c) => getConversationId(c) === payload.conversationId);
-        if (index === -1) return prev;
+        if (index === -1) {
+          foundInState = false;
+          return prev;
+        }
         const updated = [...prev];
         const [moved] = updated.splice(index, 1);
+        const isIncomingUnread =
+          payload.conversationId !== activeConvId &&
+          Boolean(payload.lastMessage) &&
+          payload.lastMessage?.sender !== currentUserIdRef.current &&
+          moved.lastMessage?._id !== payload.lastMessage?._id;
+
         updated.unshift({
           ...moved,
           lastMessage: payload.lastMessage,
-          updatedAt: new Date().toISOString()
+          unreadCount:
+            payload.conversationId === activeConvId
+              ? 0
+              : isIncomingUnread
+              ? (moved.unreadCount ?? 0) + 1
+              : moved.unreadCount,
+          updatedAt: payload.lastMessage?.createdAt || new Date().toISOString()
         });
         return updated;
       });
+
+      if (!foundInState) {
+        void refreshConversations();
+      }
     });
 
     socketClient.on('user_typing', (data: { conversationId: string; userId: string; username: string }) => {
@@ -206,7 +262,11 @@ export default function ChatPage() {
         setHasMoreMessages(false);
       }
       setConversations((prev) =>
-        prev.map((c) => (getConversationId(c) === payload.conversationId ? { ...c, lastMessage: null } : c))
+        prev.map((c) =>
+          getConversationId(c) === payload.conversationId
+            ? { ...c, lastMessage: null, unreadCount: 0 }
+            : c
+        )
       );
     });
 
@@ -220,7 +280,7 @@ export default function ChatPage() {
     return () => {
       socketClient.close();
     };
-  }, [router, authFetch, handleSessionExpired]);
+  }, [router, authFetch, handleSessionExpired, refreshConversations, showError]);
 
   // ============================================================================
   // 2. CONVERSATION FOCUS & MESSAGE FETCH
@@ -230,7 +290,12 @@ export default function ChatPage() {
     if (!convId) return;
 
     let cancelled = false;
+    setMessages([]);
     setHasMoreMessages(false);
+    setErrorMessage(null);
+    setConversations((prev) =>
+      prev.map((c) => (getConversationId(c) === convId ? { ...c, unreadCount: 0 } : c))
+    );
 
     const fetchMessages = async () => {
       try {
@@ -363,15 +428,19 @@ export default function ChatPage() {
     [socket, currentUsername]
   );
 
-  const handleTypingStart = useCallback(() => {
-    const convId = getConversationId(activeConversationRef.current);
-    if (socket && convId) socket.emit('typing_start', convId);
-  }, [socket]);
+  const handleTypingStart = useCallback(
+    (convId: string) => {
+      if (socket && convId) socket.emit('typing_start', convId);
+    },
+    [socket]
+  );
 
-  const handleTypingStop = useCallback(() => {
-    const convId = getConversationId(activeConversationRef.current);
-    if (socket && convId) socket.emit('typing_stop', convId);
-  }, [socket]);
+  const handleTypingStop = useCallback(
+    (convId: string) => {
+      if (socket && convId) socket.emit('typing_stop', convId);
+    },
+    [socket]
+  );
 
   const handleDeleteMessage = useCallback(
     async (messageId: string) => {
@@ -400,7 +469,7 @@ export default function ChatPage() {
     setMessages([]);
     setHasMoreMessages(false);
     setConversations((prev) =>
-      prev.map((c) => (getConversationId(c) === convId ? { ...c, lastMessage: null } : c))
+      prev.map((c) => (getConversationId(c) === convId ? { ...c, lastMessage: null, unreadCount: 0 } : c))
     );
 
     try {
@@ -418,6 +487,10 @@ export default function ChatPage() {
     const active = activeConversationRef.current;
     const convId = getConversationId(active);
     if (!active || !convId) return;
+    if (active.isGroup && active.adminId && active.adminId !== currentUserIdRef.current) {
+      showError('Only group admins can delete group channels');
+      return;
+    }
     if (!confirm(`Are you sure you want to delete this ${active.isGroup ? 'group channel' : 'conversation'} permanently?`)) {
       return;
     }
@@ -435,9 +508,10 @@ export default function ChatPage() {
     } catch (err) {
       console.error('Failed to delete conversation:', err);
     }
-  }, [socket, isConnected, authFetch]);
+  }, [socket, isConnected, authFetch, showError]);
 
   const handleBack = useCallback(() => setActiveConversation(null), []);
+  const handleDismissError = useCallback(() => setErrorMessage(null), []);
 
   const activeConvId = getConversationId(activeConversation);
 
@@ -471,6 +545,8 @@ export default function ChatPage() {
           typingUsername={activeConvId ? isTypingMap[activeConvId] : undefined}
           hasMoreMessages={hasMoreMessages}
           isLoadingOlder={isLoadingOlder}
+          errorMessage={errorMessage}
+          onDismissError={handleDismissError}
           onLoadOlderMessages={handleLoadOlderMessages}
           onBack={handleBack}
           onClearChat={handleClearChat}
@@ -480,6 +556,8 @@ export default function ChatPage() {
 
         {activeConversation && (
           <MessageInput
+            key={activeConvId}
+            conversationId={activeConvId}
             disabled={!isConnected}
             hasActiveConversation={Boolean(activeConversation)}
             onSendMessage={handleSendMessage}

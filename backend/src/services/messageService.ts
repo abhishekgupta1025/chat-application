@@ -85,7 +85,21 @@ export class MessageService {
     await this.msgRepo.markAsRead(conversationId, userId);
   }
 
-  async deleteMessage(messageId: string, userId: string): Promise<{ success: boolean; messageId: string; conversationId: string }> {
+  async deleteMessage(messageId: string, userId: string): Promise<{
+    success: boolean;
+    messageId: string;
+    conversationId: string;
+    lastMessage: {
+      _id: string;
+      id: string;
+      conversationId: string;
+      sender: string;
+      senderName: string;
+      text: string;
+      status: string;
+      createdAt: Date;
+    } | null;
+  }> {
     if (!isValidUuid(messageId)) throw new BadRequestError('Invalid message ID');
 
     const msg = await this.msgRepo.findById(messageId);
@@ -102,13 +116,25 @@ export class MessageService {
 
     // Refresh lastMessage if needed
     const remainingMessages = await this.msgRepo.findByConversation(conversationId, undefined, 1);
-    const newLastMessageId = remainingMessages.length > 0 ? remainingMessages[remainingMessages.length - 1].id : null;
-    await this.convRepo.updateLastMessage(conversationId, newLastMessageId);
+    const latest = remainingMessages.length > 0 ? remainingMessages[remainingMessages.length - 1] : null;
+    await this.convRepo.updateLastMessage(conversationId, latest ? latest.id : null);
 
     return {
       success: true,
       messageId,
-      conversationId
+      conversationId,
+      lastMessage: latest
+        ? {
+            _id: latest.id,
+            id: latest.id,
+            conversationId: latest.conversationId,
+            sender: latest.senderId,
+            senderName: latest.senderName,
+            text: latest.text,
+            status: latest.status,
+            createdAt: latest.createdAt
+          }
+        : null
     };
   }
 }

@@ -12,7 +12,12 @@ export class ConversationService {
   async getUserConversations(userId?: string) {
     if (!userId) throw new UnauthorizedError('User authentication required');
 
-    const list = await this.convRepo.findUserConversations(userId);
+    const [list, unreadMap] = await Promise.all([
+      this.convRepo.findUserConversations(userId),
+      typeof this.convRepo.countUnreadByConversation === 'function'
+        ? this.convRepo.countUnreadByConversation(userId)
+        : Promise.resolve(new Map<string, number>())
+    ]);
 
     return list.map((c: any) => ({
       _id: c.id,
@@ -20,6 +25,7 @@ export class ConversationService {
       isGroup: c.isGroup,
       name: c.name,
       adminId: c.adminId,
+      unreadCount: unreadMap.get(c.id) ?? 0,
       updatedAt: c.updatedAt,
       createdAt: c.createdAt,
       participants: (c.participants || []).map((p: any) => ({

@@ -22,6 +22,7 @@ export interface Conversation {
   isGroup: boolean;
   name?: string;
   adminId?: string;
+  unreadCount?: number;
   participants: User[];
   lastMessage?: Message | null;
   updatedAt: string;

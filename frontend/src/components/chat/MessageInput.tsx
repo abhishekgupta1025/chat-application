@@ -1,20 +1,22 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Send, Smile } from 'lucide-react';
 
 const POPULAR_EMOJIS = ['👍', '❤️', '🔥', '😂', '🎉', '🚀', '👏', '✨', '💯', '🙏', '😍', '👋'];
 
 interface MessageInputProps {
+  conversationId: string;
   disabled: boolean;
   hasActiveConversation: boolean;
   onSendMessage: (text: string) => void;
-  onTypingStart: () => void;
-  onTypingStop: () => void;
+  onTypingStart: (conversationId: string) => void;
+  onTypingStop: (conversationId: string) => void;
 }
 
 export const MessageInput = React.memo(function MessageInput({
+  conversationId,
   disabled,
   hasActiveConversation,
   onSendMessage,
@@ -24,7 +26,24 @@ export const MessageInput = React.memo(function MessageInput({
   const [messageInput, setMessageInput] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isTypingRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const onTypingStopRef = useRef(onTypingStop);
+  onTypingStopRef.current = onTypingStop;
+
+  // Stop typing indicator for the exact conversationId on unmount or chat switch
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      if (isTypingRef.current && conversationId) {
+        isTypingRef.current = false;
+        onTypingStopRef.current(conversationId);
+      }
+    };
+  }, [conversationId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,20 +52,31 @@ export const MessageInput = React.memo(function MessageInput({
 
     setMessageInput('');
     setShowEmojiPicker(false);
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    onTypingStop();
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+    if (isTypingRef.current) {
+      isTypingRef.current = false;
+      onTypingStop(conversationId);
+    }
     onSendMessage(trimmed);
     inputRef.current?.focus();
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMessageInput(e.target.value);
-    if (disabled || !hasActiveConversation) return;
+    if (disabled || !hasActiveConversation || !conversationId) return;
 
-    onTypingStart();
+    isTypingRef.current = true;
+    onTypingStart(conversationId);
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
-      onTypingStop();
+      typingTimeoutRef.current = null;
+      if (isTypingRef.current) {
+        isTypingRef.current = false;
+        onTypingStop(conversationId);
+      }
     }, 1500);
   };
 
