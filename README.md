@@ -17,7 +17,7 @@ Hosted 24/7 with zero sleep timers on Oracle Cloud Always Free Infrastructure an
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 
 [![Oracle Cloud](https://img.shields.io/badge/Oracle_Cloud-Always_Free_VPS-F80000?style=flat-square&logo=oracle&logoColor=white)](https://www.oracle.com/cloud/free/)
-[![Caddy](https://img.shields.io/badge/Caddy-Auto_HTTPS%2FWSS-00ADD8?style=flat-square&logo=caddy&logoColor=white)](https://caddyserver.com/)
+[![Caddy](https://img.shields.io/badge/Caddy-Auto_HTTPS%2FWSS_%28previously_Coolify%29-00ADD8?style=flat-square&logo=caddy&logoColor=white)](https://caddyserver.com/)
 [![Supabase](https://img.shields.io/badge/Supabase-Managed_Postgres-3ECF8E?style=flat-square&logo=supabase&logoColor=white)](https://supabase.com/)
 [![Vercel](https://img.shields.io/badge/Vercel-Edge_CDN-000000?style=flat-square&logo=vercel&logoColor=white)](https://vercel.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
@@ -311,7 +311,7 @@ xychart-beta
 ## Deployment Architecture
 
 - **Frontend**: Hosted on **Vercel** with automatic Git deployments and global Edge CDN caching.
-- **Backend**: Live on an **Oracle Cloud Always Free VM** (`VM.Standard.E2.1.Micro`, Ubuntu 24.04.5 LTS x86_64, 1/8 OCPU, `952 MiB` RAM + `2 GiB` swap) running **Native Bun `1.4.5` (`systemd`)** behind **Caddy `v2.11.9`** automatic HTTPS/WSS (`backend/Dockerfile` & `docker-compose.yml` also included for containerized deployments).
+- **Backend**: Live on an **Oracle Cloud Always Free VM** (`VM.Standard.E2.1.Micro`, Ubuntu 24.04.5 LTS x86_64, 1/8 OCPU, `952 MiB` RAM + `2 GiB` swap) running **Native Bun `1.4.5` (`systemd`)** behind **Caddy `v2.11.9`** automatic HTTPS/WSS *(previously Coolify + Docker on ARM64; `backend/Dockerfile` & `docker-compose.yml` remain included for containerized deployments)*.
 - **Database**: **Supabase Managed PostgreSQL** connected over IPv4 pooler transaction mode (`port 6543`, `prepare: false`).
 
 ---
