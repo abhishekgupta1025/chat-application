@@ -1,11 +1,51 @@
 import { eq, and, desc, lt } from 'drizzle-orm';
-import { db } from '../config/db';
+import { db, pgClient } from '../config/db';
 import { messages, messageReads, Message, NewMessage } from '../db/schema';
 
 export class MessageRepository {
   async create(data: NewMessage): Promise<Message> {
     const [created] = await db.insert(messages).values(data).returning();
     return created;
+  }
+
+  /**
+   * Inserts a message and updates its parent conversation's last_message_id
+   * in a single PostgreSQL round-trip via CTE.
+   */
+  async createAndTouchConversation(data: NewMessage): Promise<Message> {
+    const status = data.status ?? 'sent';
+    const [row] = await pgClient<Array<{
+      id: string;
+      conversationId: string;
+      senderId: string;
+      senderName: string;
+      text: string;
+      status: string;
+      createdAt: Date;
+      updatedAt: Date;
+    }>>`
+      WITH inserted AS (
+        INSERT INTO messages (conversation_id, sender_id, sender_name, text, status)
+        VALUES (${data.conversationId}, ${data.senderId}, ${data.senderName}, ${data.text}, ${status})
+        RETURNING
+          id,
+          conversation_id AS "conversationId",
+          sender_id AS "senderId",
+          sender_name AS "senderName",
+          text,
+          status,
+          created_at AS "createdAt",
+          updated_at AS "updatedAt"
+      ),
+      updated_conv AS (
+        UPDATE conversations
+        SET last_message_id = (SELECT id FROM inserted),
+            updated_at = NOW()
+        WHERE id = ${data.conversationId}
+      )
+      SELECT * FROM inserted
+    `;
+    return row;
   }
 
   async findByConversation(

@@ -8,7 +8,7 @@ const connectionString =
 
 // Initialize postgres.js client with connection pooling and SSL support for Supabase
 export const pgClient = postgres(connectionString, {
-  max: 10,
+  max: 15,
   idle_timeout: 20,
   connect_timeout: 15,
   ssl: connectionString.includes('supabase.co') || connectionString.includes('sslmode=require') ? 'require' : false

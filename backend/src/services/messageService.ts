@@ -13,17 +13,21 @@ export class MessageService {
       throw new BadRequestError('Invalid conversation or empty message text');
     }
 
-    // Insert message
-    const saved = await this.msgRepo.create({
+    const payload = {
       conversationId,
       senderId,
       senderName,
       text: text.trim(),
       status: 'sent'
-    });
+    };
 
-    // Update conversation lastMessageId
-    await this.convRepo.updateLastMessage(conversationId, saved.id);
+    const saved = typeof this.msgRepo.createAndTouchConversation === 'function'
+      ? await this.msgRepo.createAndTouchConversation(payload)
+      : await (async () => {
+          const created = await this.msgRepo.create(payload);
+          await this.convRepo.updateLastMessage(conversationId, created.id);
+          return created;
+        })();
 
     return {
       _id: saved.id,

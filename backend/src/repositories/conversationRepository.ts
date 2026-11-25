@@ -75,6 +75,14 @@ export class ConversationRepository {
     return createdConv;
   }
 
+  async findParticipantIds(conversationId: string): Promise<string[]> {
+    const rows = await db.query.conversationParticipants.findMany({
+      where: eq(conversationParticipants.conversationId, conversationId),
+      columns: { userId: true }
+    });
+    return rows.map((r) => r.userId);
+  }
+
   async isParticipant(conversationId: string, userId: string): Promise<boolean> {
     const membership = await db.query.conversationParticipants.findFirst({
       where: and(

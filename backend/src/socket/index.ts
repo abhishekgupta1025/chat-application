@@ -1,13 +1,46 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { messageService } from '../services/messageService';
 import { conversationService } from '../services/conversationService';
+import { conversationRepository } from '../repositories/conversationRepository';
 import { AuthenticatedSocket } from '../middleware/socketAuth';
 
 // In-Memory state for live presence tracking (can be backed by Redis at scale)
 // Maps userId -> Set of active socket IDs (allows multiple browser tabs)
 const onlineUsers = new Map<string, Set<string>>();
 
+// Bounded cache of conversationId -> participant userIds to scope conversation_updated
+const participantCache = new Map<string, string[]>();
+const MAX_PARTICIPANT_CACHE = 5000;
+
+async function getParticipantUserRooms(conversationId: string): Promise<string[]> {
+  let participantIds = participantCache.get(conversationId);
+  if (!participantIds) {
+    participantIds = await conversationRepository.findParticipantIds(conversationId);
+    if (participantCache.size >= MAX_PARTICIPANT_CACHE) {
+      const oldestKey = participantCache.keys().next().value;
+      if (oldestKey) participantCache.delete(oldestKey);
+    }
+    participantCache.set(conversationId, participantIds);
+  }
+  return participantIds.map((id) => `user_${id}`);
+}
+
 export const setupSocketServer = (io: SocketIOServer): void => {
+  let presenceTimer: ReturnType<typeof setTimeout> | null = null;
+  let presenceDirty = false;
+  const PRESENCE_THROTTLE_MS = 2000;
+
+  const schedulePresenceBroadcast = (): void => {
+    presenceDirty = true;
+    if (presenceTimer) return;
+    presenceTimer = setTimeout(() => {
+      presenceTimer = null;
+      if (!presenceDirty) return;
+      presenceDirty = false;
+      io.emit('online_users', Array.from(onlineUsers.keys()));
+    }, PRESENCE_THROTTLE_MS);
+  };
+
   io.on('connection', (socket: Socket) => {
     const authSocket = socket as AuthenticatedSocket;
     const user = authSocket.data.user;
@@ -19,27 +52,31 @@ export const setupSocketServer = (io: SocketIOServer): void => {
     }
 
     const { userId, username } = user;
-    console.log(`🔌 User connected: ${username} (${userId}) on socket ${socket.id}`);
+
+    // Join personal room for scoped sidebar/conversation_updated notifications
+    socket.join(`user_${userId}`);
 
     // Track active socket connection
-    if (!onlineUsers.has(userId)) {
-      onlineUsers.set(userId, new Set<string>());
+    let userSockets = onlineUsers.get(userId);
+    const wasOffline = !userSockets || userSockets.size === 0;
+    if (!userSockets) {
+      userSockets = new Set<string>();
+      onlineUsers.set(userId, userSockets);
     }
-    onlineUsers.get(userId)?.add(socket.id);
+    userSockets.add(socket.id);
 
-    // Broadcast updated online users list to all connected clients
-    const activeUserIds = Array.from(onlineUsers.keys());
-    io.emit('online_users', activeUserIds);
+    // Send immediate snapshot to the connecting socket; throttle global broadcast
+    socket.emit('online_users', Array.from(onlineUsers.keys()));
+    if (wasOffline) {
+      schedulePresenceBroadcast();
+    }
 
     // =========================================================================
     // EVENT: JOIN CONVERSATION
     // =========================================================================
     socket.on('join_conversation', async (conversationId: string) => {
       if (!conversationId || typeof conversationId !== 'string') return;
-
-      const roomName = `conv_${conversationId}`;
-      socket.join(roomName);
-      console.log(`📡 Socket ${socket.id} (${username}) joined room ${roomName}`);
+      socket.join(`conv_${conversationId}`);
     });
 
     // =========================================================================
@@ -47,9 +84,7 @@ export const setupSocketServer = (io: SocketIOServer): void => {
     // =========================================================================
     socket.on('leave_conversation', (conversationId: string) => {
       if (!conversationId || typeof conversationId !== 'string') return;
-      const roomName = `conv_${conversationId}`;
-      socket.leave(roomName);
-      console.log(`🚪 Socket ${socket.id} (${username}) left room ${roomName}`);
+      socket.leave(`conv_${conversationId}`);
     });
 
     // =========================================================================
@@ -66,7 +101,7 @@ export const setupSocketServer = (io: SocketIOServer): void => {
             return;
           }
 
-          // Leverage domain MessageService to persist and update conversation
+          // Single-CTE message insert + conversation update
           const formattedMessage = await messageService.sendMessage(
             conversationId,
             userId,
@@ -76,17 +111,25 @@ export const setupSocketServer = (io: SocketIOServer): void => {
 
           const roomName = `conv_${conversationId}`;
 
-          // Broadcast to everyone in the room
+          // Broadcast to active participants in the conversation room
           io.to(roomName).emit('receive_message', {
             message: formattedMessage,
             tempId
           });
 
-          // Notify all clients to re-order recent conversation previews in sidebar
-          io.emit('conversation_updated', {
-            conversationId,
-            lastMessage: formattedMessage
-          });
+          // Scope conversation_updated to this conversation's participant user rooms
+          const targetRooms = await getParticipantUserRooms(conversationId);
+          if (targetRooms.length > 0) {
+            io.to(targetRooms).emit('conversation_updated', {
+              conversationId,
+              lastMessage: formattedMessage
+            });
+          } else {
+            io.to(roomName).emit('conversation_updated', {
+              conversationId,
+              lastMessage: formattedMessage
+            });
+          }
         } catch (error: any) {
           console.error('Error handling send_message socket event:', error);
           socket.emit('error_message', { error: error.message || 'Failed to deliver message' });
@@ -181,6 +224,7 @@ export const setupSocketServer = (io: SocketIOServer): void => {
         if (!conversationId) return;
 
         await conversationService.deleteConversation(conversationId, userId);
+        participantCache.delete(conversationId);
 
         const roomName = `conv_${conversationId}`;
         io.to(roomName).emit('conversation_deleted', {
@@ -195,14 +239,12 @@ export const setupSocketServer = (io: SocketIOServer): void => {
     // EVENT: DISCONNECTION & PRESENCE CLEANUP
     // =========================================================================
     socket.on('disconnect', () => {
-      console.log(`🔌 Socket disconnected: ${socket.id} (${username})`);
-
       const userSockets = onlineUsers.get(userId);
       if (userSockets) {
         userSockets.delete(socket.id);
         if (userSockets.size === 0) {
           onlineUsers.delete(userId);
-          io.emit('online_users', Array.from(onlineUsers.keys()));
+          schedulePresenceBroadcast();
         }
       }
     });

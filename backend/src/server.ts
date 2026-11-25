@@ -45,6 +45,23 @@ app.use('/api/conversations', conversationRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/admin', adminRoutes);
 
+// Lightweight event-loop lag monitor (1s timer drift check)
+let eventLoopLagMs = 0;
+let maxEventLoopLagMs = 0;
+let lastTick = performance.now();
+setInterval(() => {
+  const now = performance.now();
+  const lag = Math.max(0, now - lastTick - 1000);
+  lastTick = now;
+  eventLoopLagMs = Number(lag.toFixed(1));
+  if (eventLoopLagMs > maxEventLoopLagMs) {
+    maxEventLoopLagMs = eventLoopLagMs;
+  }
+  if (lag > 100) {
+    console.warn(`⚠️ Event-loop lag spike: ${eventLoopLagMs}ms`);
+  }
+}, 1000).unref();
+
 // Health check endpoint (Used by Render / Railway / Uptime Robot to keep server alive)
 app.get('/health', (_req, res) => {
   res.json({
@@ -52,6 +69,8 @@ app.get('/health', (_req, res) => {
     runtime: 'Bun',
     version: '3.0.0',
     database: 'PostgreSQL (Supabase)',
+    eventLoopLagMs,
+    maxEventLoopLagMs,
     timestamp: new Date()
   });
 });
