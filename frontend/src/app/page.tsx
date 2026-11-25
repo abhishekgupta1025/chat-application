@@ -41,7 +41,7 @@ import {
   Lock
 } from 'lucide-react';
 
-const RAW_BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://xvg69sogcx42p7o5ewsxh84m.144.24.112.62.sslip.io';
+const RAW_BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://130.210.55.231.sslip.io';
 const BACKEND_URL = typeof window !== 'undefined' && window.location.protocol === 'https:'
   ? RAW_BACKEND_URL.replace(/^http:\/\//i, 'https://')
   : RAW_BACKEND_URL;

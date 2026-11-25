@@ -25,7 +25,7 @@ Hosted 24/7 with zero sleep timers on Oracle Cloud Always Free Infrastructure an
 <br/>
 <br/>
 
-**[ 🚀 Live Demo ](https://chat-application-mocha-xi.vercel.app)** &nbsp;•&nbsp; **[ ⚡ API Health Check ](http://xvg69sogcx42p7o5ewsxh84m.144.24.112.62.sslip.io/health)** &nbsp;•&nbsp; **[ 🧪 Run Tests ](#testing)** &nbsp;•&nbsp; **[ 📦 Quickstart ](#getting-started)** &nbsp;•&nbsp; **[ 🏗️ Architecture ](#architecture--engineering-decisions)**
+**[ 🚀 Live Demo ](https://chat-application-mocha-xi.vercel.app)** &nbsp;•&nbsp; **[ ⚡ API Health Check ](https://130.210.55.231.sslip.io/health)** &nbsp;•&nbsp; **[ 🧪 Run Tests ](#testing)** &nbsp;•&nbsp; **[ 📦 Quickstart ](#getting-started)** &nbsp;•&nbsp; **[ 🏗️ Architecture ](#architecture--engineering-decisions)**
 
 <br/>
 <br/>
