@@ -1,6 +1,9 @@
 import { messageRepository, MessageRepository } from '../repositories/messageRepository';
 import { conversationRepository, ConversationRepository } from '../repositories/conversationRepository';
 import { BadRequestError, ForbiddenError } from '../errors/AppError';
+import { isValidUuid } from '../config/env';
+
+const MAX_MESSAGE_LENGTH = 4000;
 
 export class MessageService {
   constructor(
@@ -9,15 +12,20 @@ export class MessageService {
   ) {}
 
   async sendMessage(conversationId: string, senderId: string, senderName: string, text: string) {
-    if (!conversationId || !text || !text.trim()) {
+    if (!isValidUuid(conversationId) || !text || !text.trim()) {
       throw new BadRequestError('Invalid conversation or empty message text');
+    }
+
+    const trimmedText = text.trim();
+    if (trimmedText.length > MAX_MESSAGE_LENGTH) {
+      throw new BadRequestError(`Message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters`);
     }
 
     const payload = {
       conversationId,
       senderId,
       senderName,
-      text: text.trim(),
+      text: trimmedText,
       status: 'sent'
     };
 
@@ -42,7 +50,7 @@ export class MessageService {
   }
 
   async getConversationMessages(conversationId: string, userId: string, before?: string, limit: number = 50) {
-    if (!conversationId) throw new BadRequestError('Conversation ID is required');
+    if (!isValidUuid(conversationId)) throw new BadRequestError('Invalid conversation ID');
 
     // Check membership
     const isMember = await this.convRepo.isParticipant(conversationId, userId);
@@ -50,7 +58,14 @@ export class MessageService {
       throw new ForbiddenError('You are not a member of this conversation');
     }
 
-    const beforeDate = before ? new Date(before) : undefined;
+    let beforeDate: Date | undefined;
+    if (before !== undefined && before !== '') {
+      beforeDate = new Date(before);
+      if (Number.isNaN(beforeDate.getTime())) {
+        throw new BadRequestError('Invalid before timestamp');
+      }
+    }
+
     const rawList = await this.msgRepo.findByConversation(conversationId, beforeDate, limit);
 
     return rawList.map((m) => ({
@@ -66,12 +81,12 @@ export class MessageService {
   }
 
   async markAsRead(conversationId: string, userId: string) {
-    if (!conversationId || !userId) return;
+    if (!isValidUuid(conversationId) || !isValidUuid(userId)) return;
     await this.msgRepo.markAsRead(conversationId, userId);
   }
 
   async deleteMessage(messageId: string, userId: string): Promise<{ success: boolean; messageId: string; conversationId: string }> {
-    if (!messageId) throw new BadRequestError('Message ID is required');
+    if (!isValidUuid(messageId)) throw new BadRequestError('Invalid message ID');
 
     const msg = await this.msgRepo.findById(messageId);
     if (!msg) {

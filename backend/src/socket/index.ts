@@ -3,12 +3,13 @@ import { messageService } from '../services/messageService';
 import { conversationService } from '../services/conversationService';
 import { conversationRepository } from '../repositories/conversationRepository';
 import { AuthenticatedSocket } from '../middleware/socketAuth';
+import { isValidUuid } from '../config/env';
 
 // In-Memory state for live presence tracking (can be backed by Redis at scale)
 // Maps userId -> Set of active socket IDs (allows multiple browser tabs)
 const onlineUsers = new Map<string, Set<string>>();
 
-// Bounded LRU + TTL cache of conversationId -> participant userIds to scope conversation_updated
+// Bounded LRU + TTL cache of conversationId -> participant userIds to scope conversation_updated & membership checks
 const participantCache = new Map<string, { ids: string[]; expiresAt: number }>();
 const MAX_PARTICIPANT_CACHE = 2000;
 const PARTICIPANT_CACHE_TTL_MS = 5 * 60_000;
@@ -17,29 +18,39 @@ export function invalidateParticipantCache(conversationId: string): void {
   participantCache.delete(conversationId);
 }
 
-async function getParticipantUserRooms(conversationId: string): Promise<string[]> {
+async function getParticipantIds(conversationId: string): Promise<string[]> {
+  if (!isValidUuid(conversationId)) return [];
+
   const now = Date.now();
   const cached = participantCache.get(conversationId);
-  let participantIds: string[];
-
   if (cached && cached.expiresAt > now) {
-    // Refresh LRU recency
     participantCache.delete(conversationId);
     participantCache.set(conversationId, cached);
-    participantIds = cached.ids;
-  } else {
-    if (cached) participantCache.delete(conversationId);
-    participantIds = await conversationRepository.findParticipantIds(conversationId);
-    if (participantCache.size >= MAX_PARTICIPANT_CACHE) {
-      const oldestKey = participantCache.keys().next().value;
-      if (oldestKey) participantCache.delete(oldestKey);
-    }
-    participantCache.set(conversationId, {
-      ids: participantIds,
-      expiresAt: now + PARTICIPANT_CACHE_TTL_MS
-    });
+    return cached.ids;
   }
 
+  if (cached) participantCache.delete(conversationId);
+  const participantIds = await conversationRepository.findParticipantIds(conversationId);
+  if (participantCache.size >= MAX_PARTICIPANT_CACHE) {
+    const oldestKey = participantCache.keys().next().value;
+    if (oldestKey) participantCache.delete(oldestKey);
+  }
+  participantCache.set(conversationId, {
+    ids: participantIds,
+    expiresAt: now + PARTICIPANT_CACHE_TTL_MS
+  });
+
+  return participantIds;
+}
+
+async function isUserInConversation(conversationId: string, userId: string): Promise<boolean> {
+  if (!isValidUuid(conversationId) || !isValidUuid(userId)) return false;
+  const ids = await getParticipantIds(conversationId);
+  return ids.includes(userId);
+}
+
+async function getParticipantUserRooms(conversationId: string): Promise<string[]> {
+  const participantIds = await getParticipantIds(conversationId);
   return participantIds.map((id) => `user_${id}`);
 }
 
@@ -90,23 +101,30 @@ export const setupSocketServer = (io: SocketIOServer): void => {
     }
 
     // =========================================================================
-    // EVENT: JOIN CONVERSATION
+    // EVENT: JOIN CONVERSATION (Membership Verified)
     // =========================================================================
     socket.on('join_conversation', async (conversationId: string) => {
-      if (!conversationId || typeof conversationId !== 'string') return;
-      socket.join(`conv_${conversationId}`);
+      try {
+        if (!(await isUserInConversation(conversationId, userId))) {
+          socket.emit('error_message', { error: 'Unauthorized: Not a participant in this conversation' });
+          return;
+        }
+        socket.join(`conv_${conversationId}`);
+      } catch (error) {
+        console.error('Error joining conversation:', error);
+      }
     });
 
     // =========================================================================
     // EVENT: LEAVE CONVERSATION
     // =========================================================================
     socket.on('leave_conversation', (conversationId: string) => {
-      if (!conversationId || typeof conversationId !== 'string') return;
+      if (!isValidUuid(conversationId)) return;
       socket.leave(`conv_${conversationId}`);
     });
 
     // =========================================================================
-    // EVENT: SEND MESSAGE
+    // EVENT: SEND MESSAGE (Membership Verified)
     // =========================================================================
     socket.on(
       'send_message',
@@ -114,8 +132,13 @@ export const setupSocketServer = (io: SocketIOServer): void => {
         try {
           const { conversationId, text, tempId } = data;
 
-          if (!conversationId || !text || !text.trim()) {
+          if (!isValidUuid(conversationId) || !text || !text.trim()) {
             socket.emit('error_message', { error: 'Invalid message payload' });
+            return;
+          }
+
+          if (!(await isUserInConversation(conversationId, userId))) {
+            socket.emit('error_message', { error: 'Unauthorized: Not a participant in this conversation' });
             return;
           }
 
@@ -156,10 +179,10 @@ export const setupSocketServer = (io: SocketIOServer): void => {
     );
 
     // =========================================================================
-    // EVENT: TYPING INDICATORS (Throttled on Client)
+    // EVENT: TYPING INDICATORS (Membership Verified, Throttled on Client)
     // =========================================================================
-    socket.on('typing_start', (conversationId: string) => {
-      if (!conversationId || typeof conversationId !== 'string') return;
+    socket.on('typing_start', async (conversationId: string) => {
+      if (!(await isUserInConversation(conversationId, userId))) return;
       const roomName = `conv_${conversationId}`;
       socket.to(roomName).emit('user_typing', {
         conversationId,
@@ -168,8 +191,8 @@ export const setupSocketServer = (io: SocketIOServer): void => {
       });
     });
 
-    socket.on('typing_stop', (conversationId: string) => {
-      if (!conversationId || typeof conversationId !== 'string') return;
+    socket.on('typing_stop', async (conversationId: string) => {
+      if (!(await isUserInConversation(conversationId, userId))) return;
       const roomName = `conv_${conversationId}`;
       socket.to(roomName).emit('user_stop_typing', {
         conversationId,
@@ -178,11 +201,14 @@ export const setupSocketServer = (io: SocketIOServer): void => {
     });
 
     // =========================================================================
-    // EVENT: MARK MESSAGES AS READ
+    // EVENT: MARK MESSAGES AS READ (Membership Verified)
     // =========================================================================
     socket.on('mark_as_read', async (conversationId: string) => {
       try {
-        if (!conversationId) return;
+        if (!(await isUserInConversation(conversationId, userId))) {
+          socket.emit('error_message', { error: 'Unauthorized: Not a participant in this conversation' });
+          return;
+        }
 
         await messageService.markAsRead(conversationId, userId);
 

@@ -1,10 +1,9 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from '../db/schema';
+import { env } from './env';
 
-const connectionString =
-  process.env.DATABASE_URL ||
-  'postgresql://postgres:postgrespassword@localhost:5432/postgres';
+const connectionString = env.databaseUrl;
 
 // Initialize postgres.js client with connection pooling and SSL support for Supabase
 // Disable prepared statements for Supabase Transaction Pooler (port 6543)

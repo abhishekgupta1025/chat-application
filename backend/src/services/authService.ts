@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { userRepository, UserRepository } from '../repositories/userRepository';
 import { BadRequestError, ConflictError, UnauthorizedError } from '../errors/AppError';
+import { env } from '../config/env';
 
 export class AuthService {
   constructor(private userRepo: UserRepository = userRepository) {}
@@ -53,9 +54,8 @@ export class AuthService {
       throw new UnauthorizedError('Invalid username or password');
     }
 
-    const secret = process.env.JWT_SECRET || 'supersecretjwtkey_12345';
     const payload = { userId: user.id, username: user.username };
-    const token = jwt.sign(payload, secret, { expiresIn: '7d' });
+    const token = jwt.sign(payload, env.jwtSecret, { expiresIn: '7d' });
 
     return {
       token,

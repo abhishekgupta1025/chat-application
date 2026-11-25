@@ -15,6 +15,23 @@ export const errorHandler = (
     return;
   }
 
+  const pgErr = err as Error & { code?: string; type?: string };
+  if (pgErr.code === '22P02' || pgErr.code === '22007' || pgErr.code === '22003') {
+    res.status(400).json({
+      success: false,
+      error: 'Invalid input identifier or timestamp format'
+    });
+    return;
+  }
+
+  if (pgErr.type === 'entity.too.large') {
+    res.status(413).json({
+      success: false,
+      error: 'Request payload too large'
+    });
+    return;
+  }
+
   console.error('💥 Unhandled Internal Error:', err);
   res.status(500).json({
     success: false,

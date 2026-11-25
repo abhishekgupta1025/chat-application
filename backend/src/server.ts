@@ -1,10 +1,9 @@
-import dotenv from 'dotenv';
-dotenv.config();
-
 import express from 'express';
 import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import cors from 'cors';
+import helmet from 'helmet';
+import { env } from './config/env';
 
 import { connectDB } from './config/db';
 import authRoutes from './routes/auth';
@@ -18,16 +17,18 @@ import { errorHandler } from './middleware/errorHandler';
 import { setupSocketServer } from './socket';
 
 const app = express();
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 
 // Allow Cross-Origin Requests from Localhost & Production Vercel Deployment
-const rawOrigins = process.env.FRONTEND_URL || 'http://localhost:3000';
+const rawOrigins = env.frontendUrl;
 const allowedOrigins = rawOrigins.includes(',')
   ? rawOrigins.split(',').map((o) => o.trim())
   : rawOrigins === '*'
   ? true
   : [rawOrigins, 'http://localhost:3000'];
 
+app.use(helmet());
 app.use(
   cors({
     origin: allowedOrigins,
@@ -36,7 +37,7 @@ app.use(
   })
 );
 
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
 
 // Setup API Routes
 app.use('/api/auth', authRoutes);

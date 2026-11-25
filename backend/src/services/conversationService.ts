@@ -1,6 +1,7 @@
 import { conversationRepository, ConversationRepository } from '../repositories/conversationRepository';
 import { userRepository, UserRepository } from '../repositories/userRepository';
-import { BadRequestError, UnauthorizedError } from '../errors/AppError';
+import { BadRequestError, ForbiddenError, UnauthorizedError } from '../errors/AppError';
+import { isValidUuid } from '../config/env';
 
 export class ConversationService {
   constructor(
@@ -42,6 +43,9 @@ export class ConversationService {
 
   async getOrCreateDirectConversation(currentUserId: string, recipientId: string) {
     if (!recipientId) throw new BadRequestError('Recipient ID is required');
+    if (!isValidUuid(recipientId)) {
+      throw new BadRequestError('Invalid recipient ID format');
+    }
     if (currentUserId === recipientId) {
       throw new BadRequestError('Cannot create a direct conversation with yourself');
     }
@@ -90,6 +94,9 @@ export class ConversationService {
     if (!participantIds || !Array.isArray(participantIds) || participantIds.length === 0) {
       throw new BadRequestError('At least one participant is required to create a group');
     }
+    if (!participantIds.every(isValidUuid)) {
+      throw new BadRequestError('Invalid participant ID format');
+    }
 
     const uniqueIds = Array.from(new Set([...participantIds, currentUserId]));
 
@@ -121,7 +128,7 @@ export class ConversationService {
   }
 
   async clearConversationMessages(conversationId: string, userId: string): Promise<{ success: boolean; conversationId: string }> {
-    if (!conversationId) throw new BadRequestError('Conversation ID is required');
+    if (!isValidUuid(conversationId)) throw new BadRequestError('Invalid conversation ID');
 
     const isMember = await this.convRepo.isParticipant(conversationId, userId);
     if (!isMember) {
@@ -137,7 +144,7 @@ export class ConversationService {
   }
 
   async deleteConversation(conversationId: string, userId: string): Promise<{ success: boolean; conversationId: string }> {
-    if (!conversationId) throw new BadRequestError('Conversation ID is required');
+    if (!isValidUuid(conversationId)) throw new BadRequestError('Invalid conversation ID');
 
     const isMember = await this.convRepo.isParticipant(conversationId, userId);
     if (!isMember) {

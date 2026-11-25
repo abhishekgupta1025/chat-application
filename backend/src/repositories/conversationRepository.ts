@@ -28,12 +28,13 @@ export class ConversationRepository {
   }
 
   async findDirectConversation(userA: string, userB: string) {
-    const userAConvs = await db.query.conversationParticipants.findMany({
-      where: eq(conversationParticipants.userId, userA),
-      columns: { conversationId: true }
-    });
+    const directUserAConvs = await db
+      .select({ conversationId: conversationParticipants.conversationId })
+      .from(conversationParticipants)
+      .innerJoin(conversations, eq(conversationParticipants.conversationId, conversations.id))
+      .where(and(eq(conversationParticipants.userId, userA), eq(conversations.isGroup, false)));
 
-    const conversationIds = userAConvs.map((c) => c.conversationId);
+    const conversationIds = directUserAConvs.map((c) => c.conversationId);
     if (conversationIds.length === 0) return null;
 
     const match = await db.query.conversationParticipants.findFirst({
@@ -63,16 +64,18 @@ export class ConversationRepository {
   }
 
   async create(data: NewConversation, participantIds: string[]): Promise<Conversation> {
-    const [createdConv] = await db.insert(conversations).values(data).returning();
+    return await db.transaction(async (tx) => {
+      const [createdConv] = await tx.insert(conversations).values(data).returning();
 
-    const participantRows = participantIds.map((uId) => ({
-      conversationId: createdConv.id,
-      userId: uId
-    }));
+      const participantRows = participantIds.map((uId) => ({
+        conversationId: createdConv.id,
+        userId: uId
+      }));
 
-    await db.insert(conversationParticipants).values(participantRows);
+      await tx.insert(conversationParticipants).values(participantRows);
 
-    return createdConv;
+      return createdConv;
+    });
   }
 
   async findParticipantIds(conversationId: string): Promise<string[]> {
@@ -114,15 +117,17 @@ export class ConversationRepository {
   }
 
   async clearMessages(conversationId: string): Promise<void> {
-    await db
-      .update(conversations)
-      .set({
-        lastMessageId: null,
-        updatedAt: new Date()
-      })
-      .where(eq(conversations.id, conversationId));
+    await db.transaction(async (tx) => {
+      await tx
+        .update(conversations)
+        .set({
+          lastMessageId: null,
+          updatedAt: new Date()
+        })
+        .where(eq(conversations.id, conversationId));
 
-    await db.delete(messages).where(eq(messages.conversationId, conversationId));
+      await tx.delete(messages).where(eq(messages.conversationId, conversationId));
+    });
   }
 
   async updateLastMessage(conversationId: string, messageId: string | null): Promise<void> {

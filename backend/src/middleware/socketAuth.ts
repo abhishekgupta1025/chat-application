@@ -1,5 +1,6 @@
 import { Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
+import { env } from '../config/env';
 
 export interface AuthenticatedSocket extends Socket {
   data: {
@@ -23,10 +24,8 @@ export const socketAuthMiddleware = (
     return next(new Error('Authentication failed: Missing token in socket handshake'));
   }
 
-  const secret = process.env.JWT_SECRET || 'supersecretjwtkey_12345';
-
   try {
-    const decoded = jwt.verify(token, secret) as {
+    const decoded = jwt.verify(token, env.jwtSecret) as {
       userId: string;
       username: string;
     };

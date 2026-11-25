@@ -151,7 +151,7 @@ export default function LoginPage() {
         </form>
 
         <div className="pt-3 border-t border-[#222e35] text-center flex items-center justify-center gap-1.5 text-[11px] text-[#8696a0]">
-          <ShieldCheck className="w-3.5 h-3.5 text-[#00a884]" /> End-to-End Encrypted • Bun + PostgreSQL
+          <ShieldCheck className="w-3.5 h-3.5 text-[#00a884]" /> Encrypted in Transit (TLS) • Bun + PostgreSQL
         </div>
 
       </div>

@@ -1,7 +1,16 @@
+import crypto from 'crypto';
 import { Router, Request, Response } from 'express';
 import { runDatabaseCleanup } from '../scripts/cleanup';
+import { env } from '../config/env';
 
 const router = Router();
+
+function safeCompare(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
 
 /**
  * POST /api/admin/cleanup
@@ -9,10 +18,10 @@ const router = Router();
  */
 router.post('/cleanup', async (req: Request, res: Response) => {
   try {
-    const adminKey = req.headers['x-admin-key'] || req.query.key;
-    const expectedKey = process.env.ADMIN_SECRET || 'supersecretjwtkey_12345';
+    const expectedKey = env.adminSecret;
+    const adminKey = req.headers['x-admin-key'];
 
-    if (process.env.ADMIN_SECRET && adminKey !== expectedKey) {
+    if (!expectedKey || typeof adminKey !== 'string' || !safeCompare(adminKey, expectedKey)) {
       return res.status(403).json({ error: 'Unauthorized: Invalid admin key' });
     }
 

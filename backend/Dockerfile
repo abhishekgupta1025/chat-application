@@ -3,11 +3,11 @@ FROM oven/bun:1-slim
 
 WORKDIR /app
 
-# Copy dependency manifest
-COPY package.json ./
+# Copy dependency manifests for reproducible builds
+COPY package.json bun.lock ./
 
-# Install production dependencies cleanly without lockfile freeze
-RUN bun install --production --no-save
+# Install exact locked production dependencies
+RUN bun install --production --frozen-lockfile
 
 # Copy source code
 COPY . .

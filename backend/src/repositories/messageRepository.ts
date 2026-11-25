@@ -88,19 +88,25 @@ export class MessageRepository {
   }
 
   async markAsRead(conversationId: string, userId: string): Promise<void> {
-    const convMessages = await db.query.messages.findMany({
-      where: eq(messages.conversationId, conversationId),
-      columns: { id: true }
-    });
-
-    if (convMessages.length > 0) {
-      const readsToInsert = convMessages.map((m) => ({
-        messageId: m.id,
-        userId: userId
-      }));
-
-      await db.insert(messageReads).values(readsToInsert).onConflictDoNothing();
-    }
+    await pgClient`
+      WITH unread AS (
+        SELECT id
+        FROM messages
+        WHERE conversation_id = ${conversationId}
+          AND sender_id <> ${userId}
+          AND status <> 'read'
+      ),
+      inserted_reads AS (
+        INSERT INTO message_reads (message_id, user_id)
+        SELECT id, ${userId}
+        FROM unread
+        ON CONFLICT DO NOTHING
+      )
+      UPDATE messages
+      SET status = 'read',
+          updated_at = NOW()
+      WHERE id IN (SELECT id FROM unread)
+    `;
   }
 }
 
