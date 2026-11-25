@@ -17,7 +17,7 @@ Hosted 24/7 with zero sleep timers on Oracle Cloud Always Free Infrastructure an
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 
 [![Oracle Cloud](https://img.shields.io/badge/Oracle_Cloud-Always_Free_VPS-F80000?style=flat-square&logo=oracle&logoColor=white)](https://www.oracle.com/cloud/free/)
-[![Coolify](https://img.shields.io/badge/Coolify-Self--Hosted_PaaS-6B21A8?style=flat-square&logo=docker&logoColor=white)](https://coolify.io/)
+[![Caddy](https://img.shields.io/badge/Caddy-Auto_HTTPS%2FWSS-00ADD8?style=flat-square&logo=caddy&logoColor=white)](https://caddyserver.com/)
 [![Supabase](https://img.shields.io/badge/Supabase-Managed_Postgres-3ECF8E?style=flat-square&logo=supabase&logoColor=white)](https://supabase.com/)
 [![Vercel](https://img.shields.io/badge/Vercel-Edge_CDN-000000?style=flat-square&logo=vercel&logoColor=white)](https://vercel.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
@@ -74,16 +74,16 @@ flowchart TB
         UI["Next.js 16 App Router + React 19\nTailwind CSS Dark Theme (WhatsApp/Telegram Aesthetic)\nStateful Socket.IO Client + Optimistic UI"]
     end
 
-    subgraph Infrastructure["Compute & Reverse Proxy (Oracle Cloud VPS)"]
-        Caddy["Caddy / Traefik Reverse Proxy (SSL Termination)"]
-        Docker["Docker CE Container (oven/bun:1-slim)"]
+    subgraph Infrastructure["Compute & Reverse Proxy (Oracle Cloud Always Free x86_64 VPS)"]
+        Caddy["Caddy v2.11.9 Reverse Proxy (Auto Let's Encrypt SSL/WSS)"]
+        BunService["Native Bun 1.4.5 Process (systemd: chatapp.service)"]
         Express["Express 5 REST API Router"]
         SocketEngine["Socket.IO Real-Time Engine"]
         Drizzle["Drizzle ORM 0.45 (Zero-Overhead SQL Builder)"]
     end
 
     subgraph Database["Managed Cloud Database (Supabase)"]
-        Pooler["Supabase IPv4 Connection Pooler (:6543)"]
+        Pooler["Supabase IPv4 Transaction Pooler (:6543, prepare: false)"]
         Postgres[("PostgreSQL 15+\n- Foreign Keys with ON DELETE CASCADE\n- Compound Cursor Index: (conversation_id, created_at)")]
     end
 
@@ -91,9 +91,9 @@ flowchart TB
     UI -->|"REST API Requests"| Caddy
     UI <-->|"Bi-directional WebSockets"| Caddy
     
-    Caddy --> Docker
-    Docker --> Express
-    Docker --> SocketEngine
+    Caddy --> BunService
+    BunService --> Express
+    BunService --> SocketEngine
     Express --> Drizzle
     SocketEngine --> Drizzle
     Drizzle --> Pooler
@@ -108,7 +108,7 @@ flowchart TB
 | **PostgreSQL + Drizzle** | MongoDB + Mongoose | MongoDB arrays for read receipts risk unbounded document growth. PostgreSQL provides foreign keys with `ON DELETE CASCADE`, composite B-tree indexes, and compile-time type safety via Drizzle ORM. |
 | **Compound Indexing** | Offset pagination (`skip/limit`) | Added index on `(conversation_id, created_at)`. Allows cursor-based queries to seek directly to the latest messages in $\mathcal{O}(\log N)$ time, avoiding slow table scans. |
 | **3-Tier LLD Architecture** | Monolithic route handlers | Separated into Controller $\to$ Service $\to$ Repository layers. Domain logic is decoupled from HTTP transport, making services mockable and unit-testable. |
-| **Oracle Cloud Always Free** | Render / Railway / Fly.io | 4 Ampere ARM OCPUs, 24 GB RAM, 200 GB SSD. Completely eliminates the 15-minute sleep timer problem while costing $0.00/month. |
+| **Oracle Cloud Always Free** | Render / Railway / Fly.io | Always Free x86_64 VM (`VM.Standard.E2.1.Micro`, 1/8 OCPU, `952 MiB` RAM + `2 GiB` swap, Ubuntu 24.04) running Native Bun via `systemd` + Caddy SSL. Eliminates 15-minute serverless sleep timers at ₹0/month (`Dockerfile` / `docker-compose.yml` also included). |
 
 ---
 
